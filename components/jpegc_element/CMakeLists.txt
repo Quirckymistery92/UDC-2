@@ -1,0 +1,13 @@
+idf_component_register(
+    SRCS
+        "src/jpegc_element.c"
+    INCLUDE_DIRS
+        "include"
+    PRIV_INCLUDE_DIRS
+        "src"
+    REQUIRES
+        esp_driver_jpeg
+        lvgl__lvgl
+        freertos
+        esp_psram
+)

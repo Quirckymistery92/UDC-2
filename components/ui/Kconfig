@@ -1,0 +1,19 @@
+menu "LVGL UI Configuration"
+
+    config LVGL_TASK_PRIORITY
+        int "LVGL Task Priority"
+        default 5
+        range 1 24
+        help
+            Priority of the LVGL task (1-24).
+            Higher values = higher priority.
+
+    config LVGL_TICK_PERIOD_MS
+        int "LVGL Tick Period (ms)"
+        default 5
+        range 1 100
+        help
+            Timer tick period for LVGL internal tick counter.
+            Lower values = more responsive but higher CPU usage.
+
+endmenu

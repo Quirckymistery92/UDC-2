@@ -1,0 +1,42 @@
+dependencies:
+  espressif/cmake_utilities:
+    component_hash: 351350613ceafba240b761b4ea991e0f231ac7a9f59a9ee901f751bddc0bb18f
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.1'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 0.5.3
+  espressif/esp_lcd_jd9365:
+    dependencies: []
+    source:
+      path: /home/naza/Escritorio/UDC-2/components/espressif__esp_lcd_jd9365
+      type: local
+    version: 2.0.2
+  espressif/esp_lcd_touch:
+    dependencies: []
+    source:
+      path: /home/naza/Escritorio/UDC-2/components/espressif__esp_lcd_touch
+      type: local
+    version: 1.2.1
+  idf:
+    source:
+      type: idf
+    version: 5.5.4
+  lvgl/lvgl:
+    dependencies: []
+    source:
+      path: /home/naza/Escritorio/UDC-2/components/lvgl__lvgl
+      type: local
+    version: 9.5.0
+direct_dependencies:
+- espressif/cmake_utilities
+- espressif/esp_lcd_jd9365
+- espressif/esp_lcd_touch
+- idf
+- lvgl/lvgl
+manifest_hash: e6442ec8ebc9b39350f66d54b5a742a0c3898b05fc7716dd8edaf949479fac84
+target: esp32p4
+version: 2.0.0

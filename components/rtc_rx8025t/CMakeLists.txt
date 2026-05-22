@@ -1,0 +1,12 @@
+idf_component_register(
+    SRCS
+        "rtc_rx8025t.c"
+        "rtc_rx8025t_hooks.c"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        "i2c_controller"
+        "esp_timer"
+        "driver"
+        "ui"
+)

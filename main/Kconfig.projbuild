@@ -1,0 +1,10 @@
+menu "UDC-2 Display Configuration"
+
+    config LCD_BL_BRIGHTNESS_LEDC_CH
+        int "LEDC channel for backlight"
+        default 1
+        range 0 7
+        help
+            LEDC channel used to generate PWM signal for display backlight.
+
+endmenu

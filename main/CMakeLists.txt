@@ -1,0 +1,20 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "drivers/display_lcd.c"
+        "drivers/display_touch.c"
+    INCLUDE_DIRS
+        "."
+        "drivers"
+    PRIV_REQUIRES
+        driver
+        esp_lcd
+        esp_hw_support
+        esp_lcd_touch_gsl3680
+        ui
+        spiffs_controller
+        jpegc_element
+        i2c_controller
+        rtc_rx8025t
+        battery_guard
+)

@@ -1,0 +1,7 @@
+version: "0.0.1"
+description: "LVGL 9 Custom Porting - UI Core Task System"
+
+dependencies:
+  lvgl/lvgl:
+    version: "9.5.0"
+
