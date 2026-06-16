@@ -60,6 +60,7 @@ struct jpegc_element_t {
 typedef struct {
     jpegc_element_handle_t handle;
     char                   filepath[JPEGC_FILEPATH_MAX];
+    lv_obj_t *target_obj; /**< Optional LVGL object passed in process_data (nullable). */
 } jpegc_element_job_t;
 
 /* ── Global subsystem context ─────────────────────────────────────────────── */

@@ -2,34 +2,7 @@
  * SPDX-FileCopyrightText: 2025
  * SPDX-License-Identifier: Apache-2.0
  *
- * LVGL 9 Porting – Display DSI + Touch GSL3680
- *
- * Architecture: DIRECT mode, driver fbs (PSRAM), 30 fps cap via #define.
- *
- * Buffers:
- *   The JD9365 DPI driver allocates LCD_DPI_BUFFER_NUMS (= 2) full-frame
- *   PSRAM buffers. We obtain both pointers via
- *   esp_lcd_dpi_panel_get_frame_buffer() and pass them directly to LVGL.
- *   No manual PSRAM allocation.
- *
- * Render mode – DIRECT:
- *   LVGL renders only dirty regions into the active (back) frame buffer.
- *   On each flush call the same dirty area is also memcpy'd to the OTHER
- *   frame buffer, keeping both buffers in sync. Without this, the inactive
- *   buffer accumulates stale/black regions that become visible on the next
- *   buffer flip → tearing in dark/black sections.
- *
- * Anti-tearing:
- *   Buffer flip (draw_bitmap) + VSYNC wait happen only on the LAST flush of
- *   each frame (lv_disp_flush_is_last). Intermediate partial flushes just
- *   copy to the other buffer and call flush_ready immediately.
- *   TaskNotify (ulTaskNotifyTake/vTaskNotifyGiveFromISR) is used instead of
- *   a binary semaphore – matches the Espressif BSP reference and avoids
- *   stale-token edge-cases without the drain trick.
- *
- * FPS cap via #define:
- *   LCD_TARGET_FPS in display_lcd.h sets both the DPI pixel clock and
- *   the LVGL refresh timer period. Change that single #define to adjust.
+ * LVGL 9 Porting – ESP32-P4 DSI + PPA Asynchronous Bounding-Box Synchronization
  */
 
 #include "porting.h"
@@ -37,10 +10,13 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "esp_log.h"
 #include "esp_check.h"
 #include "esp_lcd_mipi_dsi.h"
 #include "esp_lcd_panel_ops.h"
+#include "esp_cache.h"
+#include "driver/ppa.h"
 #include "sdkconfig.h"
 #include "lvgl.h"
 
@@ -55,57 +31,134 @@ static const char *TAG = "lvgl_porting";
 #define LV_CF           LV_COLOR_FORMAT_RGB565
 #define FRAME_BUF_SIZE  ((size_t)LVGL_H_RES * (size_t)LVGL_V_RES * BPP)
 
+#define LVGL_ALGINED_SIZE 128
+
 static lcd_handles_t           s_lcd_handles  = {0};
 static esp_lcd_touch_handle_t  s_touch_handle = NULL;
-static TaskHandle_t            s_lvgl_task    = NULL;  /* set by lvgl_porting_set_task_handle */
-static void                   *s_fb0          = NULL;  /* both frame buffer pointers for dirty-area sync */
+static void                   *s_fb0          = NULL;
 static void                   *s_fb1          = NULL;
 
+/* Arquitectura PPA Asíncrona (Aprobada para DSI + P4) */
+static ppa_client_handle_t     s_ppa_client   = NULL;
+static SemaphoreHandle_t       s_vsync_sem    = NULL;
+static TaskHandle_t            s_sync_task    = NULL;
+
+/* Variables de estado para la sincronización entre frames */
+static lv_area_t               s_dirty_bbox;
+static bool                    s_first_flush  = true;
+static lv_display_t           *s_disp_to_flush= NULL;
+static void                   *s_drawn_fb     = NULL;
+
+static inline void sync_cache_aligned(void *buf, uint32_t offset, uint32_t size, int flags) {
+    uint32_t start_addr = (uint32_t)buf + offset;
+    
+    uint32_t aligned_start = start_addr & ~(LVGL_ALGINED_SIZE - 1);
+    uint32_t aligned_size = (size + (start_addr - aligned_start) + (LVGL_ALGINED_SIZE - 1)) & ~(LVGL_ALGINED_SIZE - 1);
+
+    esp_cache_msync((void *)aligned_start, aligned_size, flags);
+}
+
+/* Callback de interrupción DSI (Ocurre en VSYNC) */
 static bool on_refresh_done_cb(esp_lcd_panel_handle_t panel, esp_lcd_dpi_panel_event_data_t *edata, void *user_ctx)
 {
-    (void)panel;
-    (void)edata;
-    (void)user_ctx;
     BaseType_t higher_prio_woken = pdFALSE;
-    if (s_lvgl_task) {
-        vTaskNotifyGiveFromISR(s_lvgl_task, &higher_prio_woken);
+    if (s_vsync_sem) {
+        xSemaphoreGiveFromISR(s_vsync_sem, &higher_prio_woken);
     }
     return higher_prio_woken == pdTRUE;
 }
 
+/* Tarea Background de altísima prioridad para sincronizar los buffers usando PPA de forma segura */
+static void ppa_sync_task_func(void *arg)
+{
+    while (1) {
+        // 1. Esperamos a que LVGL termine de mandar el frame completo
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+        // 2. Le decimos al hardware DSI que haga flip al nuevo buffer renderizado.
+        // OJO: El hardware no cambia de inmediato, lo deja en cola para el próximo VSYNC.
+        esp_lcd_panel_draw_bitmap(s_lcd_handles.panel, 0, 0, LCD_H_RES, LCD_V_RES, s_drawn_fb);
+
+        // 3. Limpiamos cualquier VSYNC viejo almacenado accidentalmente
+        xSemaphoreTake(s_vsync_sem, 0);
+
+        // 4. ESPERA CRÍTICA DE TEARING: Nos bloqueamos hasta el VSYNC real.
+        // Al pasar de aquí, confirmamos que 's_drawn_fb' está siendo escaneado de forma segura,
+        // y el 'offline_fb' (buffer viejo) ya nadie lo está usando. ¡Podemos escribir en él!
+        xSemaphoreTake(s_vsync_sem, portMAX_DELAY);
+
+        void *offline_fb = (s_drawn_fb == s_fb0) ? s_fb1 : s_fb0;
+
+        // 5. Dimensiones exactas del Bounding Box (Ahorra un 80% de esfuerzo PPA)
+        uint32_t w = s_dirty_bbox.x2 - s_dirty_bbox.x1 + 1;
+        uint32_t h = s_dirty_bbox.y2 - s_dirty_bbox.y1 + 1;
+        uint32_t offset = (s_dirty_bbox.y1 * LVGL_H_RES + s_dirty_bbox.x1) * BPP;
+        uint32_t size = (h * LVGL_H_RES) * BPP; 
+
+        // Flush (Clean) de la caché CPU a PSRAM para que el PPA vea lo que LVGL dibujó
+        sync_cache_aligned(s_drawn_fb, offset, size, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
+
+        // Configuración SRM estricta del PPA 
+        ppa_srm_oper_config_t srm_cfg;
+        memset(&srm_cfg, 0, sizeof(srm_cfg));
+
+        srm_cfg.in.buffer = s_drawn_fb;
+        srm_cfg.in.pic_w = LVGL_H_RES;
+        srm_cfg.in.pic_h = LVGL_V_RES;
+        srm_cfg.in.block_offset_x = s_dirty_bbox.x1;
+        srm_cfg.in.block_offset_y = s_dirty_bbox.y1;
+        srm_cfg.in.block_w = w;
+        srm_cfg.in.block_h = h;
+        srm_cfg.in.srm_cm = PPA_SRM_COLOR_MODE_RGB565;
+
+        srm_cfg.out.buffer = offline_fb;
+        srm_cfg.out.buffer_size = FRAME_BUF_SIZE;
+        srm_cfg.out.pic_w = LVGL_H_RES;
+        srm_cfg.out.pic_h = LVGL_V_RES;
+        srm_cfg.out.block_offset_x = s_dirty_bbox.x1;
+        srm_cfg.out.block_offset_y = s_dirty_bbox.y1;
+        srm_cfg.out.srm_cm = PPA_SRM_COLOR_MODE_RGB565;
+
+        srm_cfg.rotation_angle = PPA_SRM_ROTATION_ANGLE_0;
+        srm_cfg.scale_x = 1.0f;
+        srm_cfg.scale_y = 1.0f;
+        srm_cfg.mode = PPA_TRANS_MODE_BLOCKING;
+
+        // Ejecutar DMA a velocidad máxima
+        ppa_do_scale_rotate_mirror(s_ppa_client, &srm_cfg);
+
+        // Invalidate de PSRAM a CPU Caché, para que el próximo frame no dibuje sobre basura visual
+        sync_cache_aligned(offline_fb, offset, size, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
+
+        // 6. Resetear Bounding box y soltar a LVGL para que dibuje el siguiente frame
+        s_first_flush = true;
+        lv_disp_flush_ready(s_disp_to_flush);
+    }
+}
+
+/* Callback de LVGL: Extremadamente rápido, 0% bloqueante */
 static void display_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
-    /* Mirror this dirty area to the OTHER frame buffer so both stay in sync.
-     * Without this, the inactive buffer accumulates stale (black) content
-     * that becomes visible the next time it's used → tearing on dark sections. */
-    void *other_fb = (px_map == s_fb0) ? s_fb1 : s_fb0;
-    if (other_fb) {
-        int32_t w = area->x2 - area->x1 + 1;
-        for (int32_t row = area->y1; row <= area->y2; row++) {
-            const uint8_t *src = (const uint8_t *)px_map   + (row * LCD_H_RES + area->x1) * BPP;
-            uint8_t       *dst = (uint8_t *)other_fb        + (row * LCD_H_RES + area->x1) * BPP;
-            memcpy(dst, src, (size_t)w * BPP);
-        }
+    // Construcción del Bounding Box (Caja contenedora de todas las áreas sucias)
+    if (s_first_flush) {
+        s_dirty_bbox = *area;
+        s_first_flush = false;
+    } else {
+        if (area->x1 < s_dirty_bbox.x1) s_dirty_bbox.x1 = area->x1;
+        if (area->y1 < s_dirty_bbox.y1) s_dirty_bbox.y1 = area->y1;
+        if (area->x2 > s_dirty_bbox.x2) s_dirty_bbox.x2 = area->x2;
+        if (area->y2 > s_dirty_bbox.y2) s_dirty_bbox.y2 = area->y2;
     }
 
-    /* Only flip the DPI output pointer on the last dirty area of this frame.
-     * Flipping on every partial call would show mid-frame content. */
-    if (!lv_disp_flush_is_last(disp)) {
+    if (lv_disp_flush_is_last(disp)) {
+        s_disp_to_flush = disp;
+        s_drawn_fb = px_map;
+        // Despertar a la tarea PPA para que administre el VSYNC y la copia
+        xTaskNotifyGive(s_sync_task);
+    } else {
+        // Aún quedan trozos por dibujar de este frame, seguimos inmediatamente
         lv_disp_flush_ready(disp);
-        return;
     }
-
-    /* Flip: tell the DPI controller to start outputting px_map next VSYNC. */
-    esp_lcd_panel_draw_bitmap(s_lcd_handles.panel,
-                              0, 0, LCD_H_RES, LCD_V_RES,
-                              px_map);
-
-    /* Block until the ISR confirms the flip is complete (VSYNC fired).
-     * ulTaskNotifyTake + vTaskNotifyGiveFromISR: no stale-token risk. */
-    ulTaskNotifyValueClear(NULL, ULONG_MAX);
-    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
-    lv_disp_flush_ready(disp);
 }
 
 static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
@@ -127,11 +180,9 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
     }
 }
 
-/* Reserved: declared in porting.h and called by ui.c. Stores the LVGL task
- * handle so the ISR (on_refresh_done_cb) can unblock it via TaskNotify. */
 void lvgl_porting_set_task_handle(TaskHandle_t task)
 {
-    s_lvgl_task = task;
+    (void)task; 
 }
 
 lv_display_t *lvgl_porting_display_init(void)
@@ -148,15 +199,24 @@ lv_display_t *lvgl_porting_display_init(void)
     ESP_LOGI(TAG, "Driver fbs: [0]=%p [1]=%p (%u B each)",
              fb0, fb1, (unsigned)FRAME_BUF_SIZE);
 
+    s_vsync_sem = xSemaphoreCreateBinary();
+
+    // Iniciar tarea background de sincronización (Alta prioridad)
+    xTaskCreatePinnedToCore(ppa_sync_task_func, "ppa_sync", 4096, NULL, configMAX_PRIORITIES - 1, &s_sync_task, tskNO_AFFINITY);
+
+    // Inicializar PPA
+    ppa_client_config_t ppa_cfg;
+    memset(&ppa_cfg, 0, sizeof(ppa_cfg));
+    ppa_cfg.oper_type = PPA_OPERATION_SRM;
+    
+    ESP_ERROR_CHECK(ppa_register_client(&ppa_cfg, &s_ppa_client));
+    ESP_LOGI(TAG, "PPA hardware acceleration engine registered");
+
     lv_display_t *disp = lv_display_create(LVGL_H_RES, LVGL_V_RES);
     if (!disp) { ESP_LOGE(TAG, "lv_display_create failed"); return NULL; }
 
-    /* NOTE: semaphore removed – VSYNC sync now uses ulTaskNotifyTake /
-     *       vTaskNotifyGiveFromISR (requires s_lvgl_task to be set first). */
-
     lv_display_set_color_format(disp, LV_CF);
-    lv_display_set_buffers(disp, fb0, fb1, FRAME_BUF_SIZE,
-                           LV_DISPLAY_RENDER_MODE_DIRECT);
+    lv_display_set_buffers(disp, fb0, fb1, FRAME_BUF_SIZE, LV_DISPLAY_RENDER_MODE_DIRECT);
     lv_display_set_flush_cb(disp, display_flush_cb);
 
     esp_lcd_dpi_panel_event_callbacks_t cbs = {
@@ -167,8 +227,6 @@ lv_display_t *lvgl_porting_display_init(void)
     lv_timer_t *refr_timer = lv_display_get_refr_timer(disp);
     if (refr_timer) {
         lv_timer_set_period(refr_timer, LCD_FRAME_PERIOD_MS);
-        ESP_LOGI(TAG, "Refresh timer: %d ms (%d fps max)",
-                 LCD_FRAME_PERIOD_MS, LCD_TARGET_FPS);
     }
 
     ESP_LOGI(TAG, "Display ready: %dx%d RGB565 DIRECT+sync, driver PSRAM fbs, %d fps cap",
@@ -178,7 +236,7 @@ lv_display_t *lvgl_porting_display_init(void)
 
 lv_indev_t *lvgl_porting_touch_init(lv_display_t *disp)
 {
-    ESP_LOGI(TAG, "Initializing touch (GSL3680)...");
+    ESP_LOGI(TAG, "Initializing touch...");
     if (display_touch_init(&s_touch_handle) != ESP_OK) {
         ESP_LOGE(TAG, "Touch controller init failed"); return NULL;
     }

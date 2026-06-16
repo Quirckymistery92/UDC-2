@@ -6,7 +6,7 @@
 #include "battery_actions.h"
 #include "ui_manager.h"
 #include <stdbool.h>
-
+#include "ui.h"
 #include "esp_log.h"
 #include "battery_guard.h"
 
@@ -24,8 +24,9 @@ static void cb_shutdown_prepare_empty(void)
 
 static void cb_status_change_empty(battery_status_t status)
 {
-    ESP_LOGI(TAG, "Battery status changed: %d%%, %d mV, charging: %s",
-             status.percentage, status.voltage_mv, status.is_charging ? "yes" : "no");
+    ui_battery_set_data(status.percentage, status.voltage_mv, status.is_charging);
+    //ESP_LOGI(TAG, "Battery status changed: %d%%, %d mV, charging: %s",
+             //status.percentage, status.voltage_mv, status.is_charging ? "yes" : "no");
 
 
 }

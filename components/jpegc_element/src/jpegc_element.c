@@ -267,6 +267,7 @@ static void priv_decode_task(void *arg)
         /* ── Deliver to caller ───────────────────────────────────────────── */
         post_data.result  = ESP_OK;
         post_data.img_dsc = &h->img_dsc;
+        post_data.target_obj = job.target_obj;
         if (h->config.post_cb) {
             h->config.post_cb(&post_data);
         }
@@ -403,6 +404,7 @@ esp_err_t jpegc_element_process(jpegc_element_handle_t       handle,
     /* Build the full VFS path once here; the task receives it ready. */
     jpegc_element_job_t job;
     job.handle = handle;
+    job.target_obj = data->target_obj;
 
     const char *letter = handle->config.fs_letter      ? handle->config.fs_letter      : "";
     const char *dir    = handle->config.fs_default_dir ? handle->config.fs_default_dir : "";

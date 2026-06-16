@@ -36,6 +36,7 @@ typedef enum {
     LVGL_CMD_OBJ_REMOVE_FLAG,
     LVGL_CMD_OBJ_ADD_STATE,
     LVGL_CMD_OBJ_REMOVE_STATE,
+    LVGL_CMD_OBJ_SET_USER_DATA,
 
     /* Style properties */
     LVGL_CMD_OBJ_SET_STYLE_OPA,
@@ -55,6 +56,9 @@ typedef enum {
     /* Misc */
     LVGL_CMD_OBJ_INVALIDATE,
     LVGL_CMD_OBJ_SET_HIDDEN,
+
+    /* Specific */
+    LVGL_CMD_SPC_BAT_SET_DATA,   /**< Comando específico para actualizar datos de batería en pantalla */
 
     LVGL_CMD_MAX
 } lvgl_cmd_t;
@@ -137,6 +141,16 @@ typedef union {
         bool      value;
     } obj_simple;
 
+    struct {
+        lv_obj_t *obj;
+        void     *user_data;
+    } obj_user_data;
+    
+    struct {
+        int percentage;
+        int voltage_mv;
+        bool is_charging;
+    }spc_bat_set_data;
 } lvgl_cmd_data_t;
 
 /* ══════════════════════════════════════════════════════════════════
@@ -161,6 +175,9 @@ void lvgl_porting_unlock(void);
 esp_err_t lvgl_backlight_on(void);
 esp_err_t lvgl_backlight_off(void);
 esp_err_t lvgl_backlight_set(int brightness_percent);
+
+void ui_int__helper_get_lock_waiting_screen(uint8_t screen_id);// go to API
+void ui_int__helper_clear_lock_waiting_screen(uint8_t screen_id); // go to INTERNAL
 
 #ifdef __cplusplus
 }

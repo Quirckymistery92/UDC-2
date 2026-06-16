@@ -21,12 +21,12 @@ extern "C" {
 
 #define UI_CMD_TIMEOUT_MS  (1000)
 
-typedef enum uint8_t {
+typedef enum : uint8_t {
     UI_IMG_THUNDER_RAIL,
 } ui_backg_img_t;
 
 /* ══════════════════════════════════════════════════════════════════
- *  Initialization
+ *  Initialization & Control
  * ══════════════════════════════════════════════════════════════════ */
 
 /**
@@ -38,6 +38,8 @@ typedef enum uint8_t {
  * @return ESP_OK on success
  */
 esp_err_t ui_init(void);
+
+void ui__helper_sync_sys_screens_semaphore(ScreensEnum screen_id);
 
 /* ══════════════════════════════════════════════════════════════════
  *  Screen Management
@@ -53,7 +55,7 @@ esp_err_t ui_init(void);
  * @param auto_del   Delete the old screen after transition
  * @return ESP_OK if command enqueued
  */
-esp_err_t ui_screen_change(enum ScreensEnum screen_id,
+esp_err_t ui_screen_change(ScreensEnum screen_id,
                            lv_scr_load_anim_t anim,
                            uint32_t time,
                            uint32_t delay,
@@ -64,7 +66,7 @@ esp_err_t ui_screen_change(enum ScreensEnum screen_id,
  * @param image_path Ruta de la imagen a establecer como fondo
  * @return ´esp_err_t´ Código de error de la operación
  */
-esp_err_t ui_async_screen_backg_update(ui_backg_img_t img);
+esp_err_t ui_async_screen_backg_update(ui_backg_img_t img, lv_obj_t *obj);
 /* ══════════════════════════════════════════════════════════════════
  *  Label — ABS (Assigned Buffer Static)
  * ══════════════════════════════════════════════════════════════════ */
@@ -78,7 +80,25 @@ esp_err_t ui_async_screen_backg_update(ui_backg_img_t img);
  */
 typedef enum {
     UI_LABEL_ABS_NOTCH_HOUR = 0,  /**< Notch — hora "HH:MM" / "HH:MM:SS" (buf: 12 bytes) */
-    /* Add buff: UI_LABEL_ABS_XXX, */
+    UI_LABEL_ABS_LOCKED_USER_SELECTED_NAME,
+    UI_LABEL_ABS_LOCKED_USER_SELECTED_DATA,
+    UI_LABEL_ABS_NOTCH_EXT_BAT,
+    UI_LABEL_ABS_NOTCH_EXT_WIFI,
+    UI_LABEL_ABS_NOTCH_EXT_ZIGBEE,
+    UI_LABEL_ABS_NOTCH_EXT_UBICATION,
+    UI_LABEL_ABS_LOCKED_USERS_1_NAME,
+    UI_LABEL_ABS_LOCKED_USERS_1_DATA,
+    UI_LABEL_ABS_LOCKED_USERS_2_NAME,
+    UI_LABEL_ABS_LOCKED_USERS_2_DATA,
+    UI_LABEL_ABS_LOCKED_USERS_3_NAME,
+    UI_LABEL_ABS_LOCKED_USERS_3_DATA,
+    UI_LABEL_ABS_LOCKED_USERS_4_NAME,
+    UI_LABEL_ABS_LOCKED_USERS_4_DATA,
+    UI_LABEL_ABS_LOCKED_USERS_5_NAME,
+    UI_LABEL_ABS_LOCKED_USERS_5_DATA,
+    UI_LABEL_ABS_LOCKED_USERS_6_NAME,
+    UI_LABEL_ABS_LOCKED_USERS_6_DATA,
+    UI_LABEL_ABS_LOCKED_PIN_MESSAGE,
     UI_LABEL_ABS_COUNT
 } ui_label_abs_id_t;
 
@@ -110,6 +130,8 @@ esp_err_t ui_obj_remove_flag(lv_obj_t *obj, lv_obj_flag_t flags);
 
 esp_err_t ui_obj_add_state(lv_obj_t *obj, lv_state_t state);
 esp_err_t ui_obj_remove_state(lv_obj_t *obj, lv_state_t state);
+
+esp_err_t ui_obj_set_user_data(lv_obj_t *obj, void *user_data);
 
 /* ══════════════════════════════════════════════════════════════════
  *  Style Properties
@@ -158,6 +180,16 @@ esp_err_t ui_obj_set_align(lv_obj_t *obj, lv_align_t align);
 
 esp_err_t ui_obj_invalidate(lv_obj_t *obj);
 esp_err_t ui_obj_set_hidden(lv_obj_t *obj, bool hidden);
+
+/* ══════════════════════════════════════════════════════════════════
+ *  Specific
+ * ══════════════════════════════════════════════════════════════════ */
+ 
+esp_err_t ui_battery_set_data(int percentage, int voltage_mv, bool is_charging);
+
+bool ui_display_is_created_ds_home(void);
+bool ui_display_is_created_ds_top(void);
+bool ui_display_is_created_ds_locked(void);
 
 /* ══════════════════════════════════════════════════════════════════
  *  Backlight

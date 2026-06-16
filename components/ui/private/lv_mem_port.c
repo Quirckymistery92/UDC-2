@@ -1,20 +1,24 @@
 #include "esp_heap_caps.h"
 #include "lvgl.h"
-
+#include "esp_log.h"
 /* LVGL custom allocator – all allocations go to PSRAM. */
 
 void lv_mem_init(void)   { /* PSRAM already initialised by ESP-IDF */ }
 void lv_mem_deinit(void) { }
 
-void * lv_malloc_core(size_t size) {
-    return heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+void * lv_malloc_core(size_t size)
+{
+    return heap_caps_malloc(size,
+                                 MALLOC_CAP_SPIRAM |
+                                 MALLOC_CAP_8BIT);
 }
 
 void * lv_realloc_core(void * ptr, size_t new_size) {
     return heap_caps_realloc(ptr, new_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 }
 
-void lv_free_core(void * ptr) {
+void lv_free_core(void * ptr)
+{
     heap_caps_free(ptr);
 }
 

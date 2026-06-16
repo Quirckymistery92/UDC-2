@@ -39,6 +39,7 @@ esp_err_t label_abs_prepare(ui_label_abs_id_t id,
                              lv_obj_t        **out_obj,
                              const char      **out_buf);
 
+esp_err_t ui_int__helper_label_abs_apply_sync(ui_label_abs_id_t id, const char *text);
 #ifdef __cplusplus
 }
 #endif

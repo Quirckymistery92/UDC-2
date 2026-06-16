@@ -82,3 +82,12 @@ CONFIG_LV_PPA_BURST_LENGTH=128
 ## Layer compositing buffer: 64 KB fits in internal SRAM via the SRAM-first allocator.
 ## Larger values (e.g. 524288) force the block to PSRAM → slow random-access rendering.
 CONFIG_LV_DRAW_LAYER_SIMPLE_BUF_SIZE=65536
+
+#
+# FAT Filesystem support
+#
+CONFIG_FATFS_VOLUME_COUNT=2
+CONFIG_FATFS_LFN_HEAP=y
+# CONFIG_FATFS_LFN_STACK is not set
+# CONFIG_FATFS_SECTOR_512 is not set
+CONFIG_FATFS_SECTOR_4096=y

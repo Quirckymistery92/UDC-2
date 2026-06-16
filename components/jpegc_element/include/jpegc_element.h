@@ -26,6 +26,7 @@ typedef void (*jpegc_element_cb_pre_t)(void);
 typedef struct {
     lv_img_dsc_t *img_dsc;  /**< Ready-to-use LVGL descriptor (points to internal PSRAM buf). */
     esp_err_t     result;   /**< ESP_OK on success, error code otherwise.                      */
+    lv_obj_t     *target_obj; /**< Optional LVGL object passed in process_data                  */
 } jpegc_element_cb_post_data_t;
 
 /** Called from the decode task once decoding is complete (or failed). */
@@ -55,6 +56,7 @@ typedef enum {
  */
 typedef struct {
     const char *input_path; /**< File name, e.g. "splash.jpg". No leading slash needed. */
+    lv_obj_t  *target_obj; /**< Optional LVGL object to apply the image to (nullable). */
 } jpegc_element_process_data_t;
 
 /* ── Handle configuration ─────────────────────────────────────────────────── */

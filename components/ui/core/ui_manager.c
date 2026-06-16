@@ -11,7 +11,6 @@
 #include "ui_manager.h"
 #include "ui.h"
 #include "ui_label_abs.h"
-#include "../screens/actions.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
@@ -19,6 +18,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "ui_image_sia_internal.h"
+#include "actions_control.h"
 
 static const char *TAG = "ui_mgr";
 /**
@@ -35,7 +35,7 @@ const char* ui_backg_img_to_path(ui_backg_img_t img)
     }
 }
 /* ══════════════════════════════════════════════════════════════════
- *  Initialization
+ *  Initialization & Control
  * ══════════════════════════════════════════════════════════════════ */
 
 esp_err_t ui_init(void)
@@ -57,17 +57,25 @@ esp_err_t ui_init(void)
     ESP_LOGI(TAG, "UI subsystem ready");
     return ESP_OK;
 }
+void ui__helper_sync_sys_screens_semaphore(ScreensEnum screen_id) {
+    if (screen_id < SCREEN_ID_DS_TOP || screen_id > SCREEN_ID_DS_CONFIG) return;
+    ui_int__helper_get_lock_waiting_screen((uint8_t)screen_id);
+}
 
 /* ══════════════════════════════════════════════════════════════════
  *  Screen
  * ══════════════════════════════════════════════════════════════════ */
 
-esp_err_t ui_screen_change(enum ScreensEnum screen_id,
+esp_err_t ui_screen_change(ScreensEnum screen_id,
                            lv_scr_load_anim_t anim,
                            uint32_t time,
                            uint32_t delay,
                            bool auto_del)
 {
+    if (screen_id < SCREEN_ID_DS_TOP || screen_id > SCREEN_ID_DS_CONFIG) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
     lvgl_msg_t msg = {
         .cmd = LVGL_CMD_SCREEN_CHANGE,
         .data.screen_change = {
@@ -82,11 +90,11 @@ esp_err_t ui_screen_change(enum ScreensEnum screen_id,
 }
 
 // Método Asíncrono para actualizar fondo de pantalla de Home
-esp_err_t ui_async_screen_backg_update(ui_backg_img_t img)
+esp_err_t ui_async_screen_backg_update(ui_backg_img_t img, lv_obj_t *obj)
 {
     const char *image_path = ui_backg_img_to_path(img);
     if (!image_path) return ESP_ERR_INVALID_ARG;
-    return actions_sys_backg_update(image_path);
+    return ui_pub_actions_backg_update(image_path, obj);
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -157,6 +165,16 @@ esp_err_t ui_obj_remove_state(lv_obj_t *obj, lv_state_t state)
     lvgl_msg_t msg = {
         .cmd = LVGL_CMD_OBJ_REMOVE_STATE,
         .data.obj_state = { .obj = obj, .state = state },
+    };
+    return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
+}
+
+esp_err_t ui_obj_set_user_data(lv_obj_t *obj, void *user_data)
+{
+    if (!obj) return ESP_ERR_INVALID_ARG;
+    lvgl_msg_t msg = {
+        .cmd = LVGL_CMD_OBJ_SET_USER_DATA,
+        .data.obj_user_data = { .obj = obj, .user_data = user_data },
     };
     return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
 }
@@ -300,7 +318,29 @@ esp_err_t ui_obj_set_hidden(lv_obj_t *obj, bool hidden)
     };
     return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
 }
-
+/* ══════════════════════════════════════════════════════════════════
+ *  Specific
+ * ══════════════════════════════════════════════════════════════════ */
+esp_err_t ui_battery_set_data(int percentage, int voltage_mv, bool is_charging)
+{
+    if (percentage < 0 || percentage > 100) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    lvgl_msg_t msg = {
+        .cmd = LVGL_CMD_SPC_BAT_SET_DATA,
+        .data.spc_bat_set_data = { .percentage = percentage, .voltage_mv = voltage_mv, .is_charging = is_charging },
+    };
+    return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
+}
+bool ui_display_is_created_ds_home(void) {
+    return ui_int__is_screen_created_ds_home();
+}
+bool ui_display_is_created_ds_top(void) {
+    return ui_int__is_screen_created_ds_top();
+}
+bool ui_display_is_created_ds_locked(void) {
+    return ui_int__is_screen_created_ds_locked();
+}
 /* ══════════════════════════════════════════════════════════════════
  *  Backlight (direct, no queue)
  * ══════════════════════════════════════════════════════════════════ */

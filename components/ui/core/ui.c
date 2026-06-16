@@ -29,7 +29,6 @@
 /* Internal UI resources */
 #include "../screens/screens.h"
 #include "../images/images.h"
-#include "../screens/actions.h"
 #include "vars.h"
 
 static const char *TAG = "lvgl_ui";
@@ -37,6 +36,13 @@ static const char *TAG = "lvgl_ui";
 /* ==================================================================
  *  Global State
  * ================================================================== */
+#define MAX_SCREEN_SEMAPHORE 3
+typedef struct {
+    SemaphoreHandle_t semaphore;
+    bool in_use;
+}sync_control_helper_t;
+
+static sync_control_helper_t sync_control[MAX_SCREEN_SEMAPHORE];
 
 static TaskHandle_t      g_lvgl_task      = NULL;
 static QueueHandle_t     g_lvgl_queue     = NULL;
@@ -55,13 +61,23 @@ static int16_t           currentScreen    = -1;
  *  Helpers
  * ================================================================== */
 
-static lv_obj_t *get_screen_obj(int16_t screen_id)
+static lv_obj_t *get_screen_obj(uint8_t screen_id)
 {
-    int16_t idx = screen_id - 1;
-    if (idx < 0) return NULL;
-    return ((lv_obj_t **)&objects)[idx];
+    if (screen_id > SCREEN_ID_DS_CONFIG) return NULL;
+    return ((lv_obj_t **)&objects)[screen_id];
 }
-
+esp_err_t helper_semaphore_control_sync_create(void)
+{
+    for(size_t i = 0; i < MAX_SCREEN_SEMAPHORE; i++) {
+        sync_control[i].semaphore = xSemaphoreCreateBinary();
+        if(sync_control[i].semaphore == NULL){
+            ESP_LOGI(TAG, "Falló la asignación de semáforos internos de UI de exclusión condicional síncrona de inicialización");
+            return ESP_FAIL;
+        }
+        sync_control[i].in_use = true;
+    }
+    return ESP_OK;
+}
 /* ==================================================================
  *  Command Processing (runs ONLY inside lvgl_task)
  * ================================================================== */
@@ -75,7 +91,7 @@ static void lvgl_process_cmd(const lvgl_msg_t *msg)
     case LVGL_CMD_SCREEN_CHANGE: {
         lv_obj_t *scr = get_screen_obj(msg->data.screen_change.screen_id);
         if (scr) {
-            currentScreen = msg->data.screen_change.screen_id - 1;
+            currentScreen = msg->data.screen_change.screen_id;
             lv_scr_load_anim(scr,
                              msg->data.screen_change.anim,
                              msg->data.screen_change.time,
@@ -124,6 +140,12 @@ static void lvgl_process_cmd(const lvgl_msg_t *msg)
     case LVGL_CMD_OBJ_REMOVE_STATE:
         if (msg->data.obj_state.obj)
             lv_obj_remove_state(msg->data.obj_state.obj, msg->data.obj_state.state);
+        break;
+
+    case LVGL_CMD_OBJ_SET_USER_DATA:
+        if (msg->data.obj_user_data.obj)
+            lv_obj_set_user_data(msg->data.obj_user_data.obj,
+                                 msg->data.obj_user_data.user_data);
         break;
 
     case LVGL_CMD_OBJ_SET_STYLE_OPA:
@@ -197,6 +219,57 @@ static void lvgl_process_cmd(const lvgl_msg_t *msg)
                 lv_obj_remove_flag(msg->data.obj_simple.obj, LV_OBJ_FLAG_HIDDEN);
         }
         break;
+
+    case LVGL_CMD_SPC_BAT_SET_DATA:{
+        char message_status_buf[17];
+        const char* message_data = "Error";
+
+        if(msg->data.spc_bat_set_data.percentage > 100 || msg->data.spc_bat_set_data.percentage < 0)
+        {
+                ESP_LOGW(TAG, "Battery percentage out of range: %d", msg->data.spc_bat_set_data.percentage);
+                goto exit;
+        }
+
+        if(msg->data.spc_bat_set_data.is_charging)
+        {
+            lv_image_set_src(objects.dtop_notch_min_img_bat, &img_bat_charging30);
+            lv_image_set_src(objects.dtop_notch_exp_dat_bat_img, &img_bat_charging30);
+
+            message_data = msg->data.spc_bat_set_data.percentage == 100 ? "%d%% Cargado" : "%d%% Cargando";
+        }
+        else
+        {   
+            message_data = "%d%% descargando";
+            switch(msg->data.spc_bat_set_data.percentage)
+            {
+                case 0 ... 10:
+                    lv_image_set_src(objects.dtop_notch_min_img_bat, &img_bat_ultra_low30);
+                    lv_image_set_src(objects.dtop_notch_exp_dat_bat_img, &img_bat_ultra_low30);
+                    break;
+                case 11 ... 20:
+                    lv_image_set_src(objects.dtop_notch_min_img_bat, &img_bat_low30);
+                    lv_image_set_src(objects.dtop_notch_exp_dat_bat_img, &img_bat_low30);
+                    break;
+                case 21 ... 60:
+                    lv_image_set_src(objects.dtop_notch_min_img_bat, &img_bat_med30);
+                    lv_image_set_src(objects.dtop_notch_exp_dat_bat_img, &img_bat_med30);
+                    break;
+                default:
+                    lv_image_set_src(objects.dtop_notch_min_img_bat, &img_bat_max30);
+                    lv_image_set_src(objects.dtop_notch_exp_dat_bat_img, &img_bat_max30);
+                    break;
+            }
+        }
+
+    exit:
+        
+        snprintf(message_status_buf, sizeof(message_status_buf), message_data, msg->data.spc_bat_set_data.percentage);
+        lv_obj_t   *obj = NULL;
+        const char *buf = NULL;
+        if (label_abs_prepare(UI_LABEL_ABS_NOTCH_EXT_BAT, message_status_buf, &obj, &buf) == ESP_OK){ lv_label_set_text_static(obj, buf); }
+                 
+    }
+    break;
 
     default:
         ESP_LOGW(TAG, "Unknown command: %d", msg->cmd);
@@ -342,6 +415,9 @@ esp_err_t lvgl_init(void)
         return ESP_FAIL;
     }
 
+    esp_err_t err = helper_semaphore_control_sync_create();
+    ESP_RETURN_ON_FALSE(err == ESP_OK, ESP_FAIL, TAG, "Falló la inicializacion de semáforos internos de UI de gestión síncrona de inicialización");
+
     ESP_LOGI(TAG, "LVGL core system initialized");
     return ESP_OK;
 }
@@ -381,3 +457,34 @@ extern esp_err_t lvgl_porting_backlight_set(int brightness_percent);
 esp_err_t lvgl_backlight_on(void)  { return lvgl_porting_backlight_on();  }
 esp_err_t lvgl_backlight_off(void) { return lvgl_porting_backlight_off(); }
 esp_err_t lvgl_backlight_set(int p) { return lvgl_porting_backlight_set(p); }
+/* ==================================================================
+ *  Gestión de toma y colas de gestión de incialización para el sistema (lock for wait) INTERNAL && EXTERNAL API
+ * ================================================================== */
+
+void ui_int__helper_get_lock_waiting_screen(uint8_t screen_id) {
+    if(sync_control[screen_id].semaphore == NULL || sync_control[screen_id].in_use == false) return;
+
+    xSemaphoreTake(sync_control[screen_id].semaphore, portMAX_DELAY);
+    /**
+     * Cómo funciona esto:
+     * Crea el número total de screens en UI en un enum y en paralelo un control de carga de screens.
+     * Semáforo inicializa ya tomado, otras task a usar esta función toman el semaforo y se bloquean esperando.
+     * Cuando la Task UI procesa screen_id = SCREEN_ID_DS_TOP la misma libera el mutex y deja que la Task bloqueada continúe su schenduler.
+     * Está diseñado para usarse una sola vez en runtime e inicialización, el boolean es para inutilziarlo una vez terminado. Lo noté algo mejor
+     * que usar un destructor del semáforo, pero si te sirve, podes destruir y quitar el struct y dejar el array solo de semáforos y al terminar liberar el mutex
+     * y eliminar los semáforos apuntando a NULL.
+     * 
+     */
+    
+}
+void ui_int__helper_clear_lock_waiting_screen(uint8_t screen_id) {
+    if(sync_control[screen_id].semaphore == NULL || sync_control[screen_id].in_use == false) return;
+    xSemaphoreGive(sync_control[screen_id].semaphore);
+    sync_control[screen_id].in_use = false;
+    /**
+     * El semáforo fué liberado, y el arranque es síncrono y funcional.
+     * Acá es un punto decisivo de tu caso si quieres eliminar el
+     * semáforo o no, depende del programador actual.
+     * 
+     */
+}

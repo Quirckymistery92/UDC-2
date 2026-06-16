@@ -6,6 +6,8 @@ set(UI_SRCS_CORE
 )
 
 set(UI_SRCS_FONTS
+    "fonts/ui_font_anton80.c"
+    "fonts/ui_font_mulish12.c"
     "fonts/ui_font_mulish14.c"
     "fonts/ui_font_mulish16.c"
     "fonts/ui_font_mulish18.c"
@@ -15,27 +17,59 @@ set(UI_SRCS_FONTS
     "fonts/ui_font_mulish_bold16.c"
     "fonts/ui_font_mulish_bold18.c"
     "fonts/ui_font_mulish_bold20.c"
+    "fonts/ui_font_mulish_bold24.c"
 )
 
 set(UI_SRCS_IMAGES
-    "images/images.c"
+    "images/ui_image_arrow_back30.c"
+    "images/ui_image_arrow_restart30.c"
+    "images/ui_image_arrow_top40.c"
+    "images/ui_image_bat_charging30.c"
+    "images/ui_image_bat_low30.c"
+    "images/ui_image_bat_max30.c"
+    "images/ui_image_bat_med30.c"
+    "images/ui_image_bat_ultra_low30.c"
+    "images/ui_image_brightness30.c"
+    "images/ui_image_control_panel20.c"
+    "images/ui_image_darrow_top30.c"
+    "images/ui_image_eye_detected30.c"
+    "images/ui_image_eye_normal30.c"
+    "images/ui_image_eye_off30.c"
+    "images/ui_image_face_id40.c"
+    "images/ui_image_face_id50.c"
+    "images/ui_image_information30.c"
+    "images/ui_image_iot_active30.c"
+    "images/ui_image_location30.c"
+    "images/ui_image_menudot_v30.c"
+    "images/ui_image_pin50.c"
     "images/ui_image_sia.c"
-    "images/ui_image_bat_charging.c"
-    "images/ui_image_bat_low.c"
-    "images/ui_image_bat_max.c"
-    "images/ui_image_bat_med.c"
-    "images/ui_image_bat_ultra_low.c"
-    "images/ui_image_iot_active.c"
-    "images/ui_image_iot_face_id.c"
-    "images/ui_image_menudot_v.c"
-    "images/ui_image_mini_iot_wireless20.c"
-    "images/ui_image_mini_plug_local20.c"
-    "images/ui_image_testing.c"
-    "images/ui_image_user_logo.c"
-    "images/ui_image_utils_ai_activity.c"
-    "images/ui_image_utils_app_timer.c"
-    "images/ui_image_wifi_off.c"
-    "images/ui_image_wifi_on.c"
+    "images/ui_image_sound30.c"
+    "images/ui_image_warning30.c"
+    "images/ui_image_wifi_off30.c"
+    "images/ui_image_wifi_on30.c"
+    "images/ui_image_user_logo_default50.c"
+    "images/ui_image_user_logo_baby50.c"
+    "images/ui_image_user_logo_child50.c"
+    "images/ui_image_user_logo_diamond50.c"
+    "images/ui_image_user_logo_dog50.c"
+    "images/ui_image_user_logo_father50.c"
+    "images/ui_image_user_logo_girl50.c"
+    "images/ui_image_user_logo_granny50.c"
+    "images/ui_image_user_logo_guest50.c"
+    "images/ui_image_user_logo_guy50.c"
+    "images/ui_image_user_logo_happy50.c"
+    "images/ui_image_user_logo_math50.c"
+    "images/ui_image_user_logo_mom50.c"
+    "images/ui_image_user_logo_nature50.c"
+    "images/ui_image_user_logo_normal50.c"
+    "images/ui_image_user_logo_owl50.c"
+    "images/ui_image_user_logo_pawprint50.c"
+    "images/ui_image_user_logo_rat50.c"
+    "images/ui_image_user_logo_robot50.c"
+    "images/ui_image_user_logo_sad50.c"
+    "images/ui_image_user_logo_shocked50.c"
+    "images/ui_image_user_logo_very_happy50.c"
+    "images/ui_image_user_logo_worried50.c"
 )
 
 set(UI_SRCS_PRIVATE
@@ -45,7 +79,11 @@ set(UI_SRCS_PRIVATE
 
 set(UI_SRCS_SCREENS
     "screens/screens.c"
-    "screens/actions.c"
+    
+    "screens/actions/actions_display_top.c"
+    "screens/actions/control/actions_control.c"
+    "screens/actions/actions_display_locked.c"
+    "screens/actions/actions_display_home.c"
 )
 
 set(UI_SRCS
@@ -68,6 +106,8 @@ idf_component_register(
     PRIV_INCLUDE_DIRS
         "private"
         "private/porting"
+        "screens/actions"
+        "screens/actions/control"
     REQUIRES
         "lvgl"
         "i2c_controller"
@@ -83,6 +123,8 @@ idf_component_register(
         "esp_timer"
         "esp_driver_ppa"
         "jpegc_element"
+        "esp_mm"
+        "sys_modules"
 )
 
 # Force the linker to pull lv_mem_port.c.obj from libui.a before processing liblvgl__lvgl.a.

@@ -25,7 +25,7 @@
  *             .buf      = buf_mi_label,
  *             .buf_size = BUF_SIZE_MI_LABEL,
  *         },
- *
+ *  5: listo xd
  * ────────────────────────────────────────────────────────────────────────────
  */
 
@@ -42,6 +42,29 @@ static const char *TAG = "label_abs";
  * ══════════════════════════════════════════════════════════════════ */
 
 #define BUF_SIZE_NOTCH_HOUR   12   /* "HH:MM:SS\0" + margen = 12 */
+#define BUF_SIZE_NOTCH_EXT_BAT 17
+#define BUF_SIZE_LOCK_USER_SELECTED_NAME 16
+#define BUF_SIZE_LOCK_USER_SELECTED_DATA 28
+
+#define BUF_SIZE_USERS_1_NAME 16
+#define BUF_SIZE_USERS_1_DATA 28
+
+#define BUF_SIZE_USERS_2_NAME 16
+#define BUF_SIZE_USERS_2_DATA 28
+
+#define BUF_SIZE_USERS_3_NAME 16
+#define BUF_SIZE_USERS_3_DATA 28
+
+#define BUF_SIZE_USERS_4_NAME 16
+#define BUF_SIZE_USERS_4_DATA 28
+
+#define BUF_SIZE_USERS_5_NAME 16
+#define BUF_SIZE_USERS_5_DATA 28
+
+#define BUF_SIZE_USERS_6_NAME 16
+#define BUF_SIZE_USERS_6_DATA 28
+
+#define BUF_SIZE_LOCK_PIN_MESSAGE 64
 /* Add buff: #define BUF_SIZE_XXX   N */
 
 /* ══════════════════════════════════════════════════════════════════
@@ -50,6 +73,30 @@ static const char *TAG = "label_abs";
  * ══════════════════════════════════════════════════════════════════ */
 
 static EXT_RAM_BSS_ATTR char buf_notch_hour[BUF_SIZE_NOTCH_HOUR];
+static EXT_RAM_BSS_ATTR char buf_notch_ext_bat[BUF_SIZE_NOTCH_EXT_BAT];
+
+static EXT_RAM_BSS_ATTR char buf_users_1_name[BUF_SIZE_USERS_1_NAME];
+static EXT_RAM_BSS_ATTR char buf_users_1_data[BUF_SIZE_USERS_1_DATA];
+
+static EXT_RAM_BSS_ATTR char buf_users_2_name[BUF_SIZE_USERS_2_NAME];
+static EXT_RAM_BSS_ATTR char buf_users_2_data[BUF_SIZE_USERS_2_DATA];
+
+static EXT_RAM_BSS_ATTR char buf_users_3_name[BUF_SIZE_USERS_3_NAME];
+static EXT_RAM_BSS_ATTR char buf_users_3_data[BUF_SIZE_USERS_3_DATA];
+
+static EXT_RAM_BSS_ATTR char buf_users_4_name[BUF_SIZE_USERS_4_NAME];
+static EXT_RAM_BSS_ATTR char buf_users_4_data[BUF_SIZE_USERS_4_DATA];
+
+static EXT_RAM_BSS_ATTR char buf_users_5_name[BUF_SIZE_USERS_5_NAME];
+static EXT_RAM_BSS_ATTR char buf_users_5_data[BUF_SIZE_USERS_5_DATA];
+
+static EXT_RAM_BSS_ATTR char buf_users_6_name[BUF_SIZE_USERS_6_NAME];
+static EXT_RAM_BSS_ATTR char buf_users_6_data[BUF_SIZE_USERS_6_DATA];
+
+static EXT_RAM_BSS_ATTR char buf_lock_user_selected_name[BUF_SIZE_LOCK_USER_SELECTED_NAME];
+static EXT_RAM_BSS_ATTR char buf_lock_user_selected_data[BUF_SIZE_LOCK_USER_SELECTED_DATA];
+
+static EXT_RAM_BSS_ATTR char buf_lock_pin_message[BUF_SIZE_LOCK_PIN_MESSAGE];
 /* Add buff: static EXT_RAM_BSS_ATTR char buf_xxx[BUF_SIZE_XXX]; */
 
 /* ══════════════════════════════════════════════════════════════════
@@ -71,11 +118,96 @@ typedef struct {
 static const label_abs_entry_t s_table[UI_LABEL_ABS_COUNT] = {
 
     [UI_LABEL_ABS_NOTCH_HOUR] = {
-        .obj_ptr  = &objects.notch_hour,
+        .obj_ptr  = &objects.dtop_notch_min_hour,
         .buf      = buf_notch_hour,
         .buf_size = BUF_SIZE_NOTCH_HOUR,
     },
+    [UI_LABEL_ABS_LOCKED_USER_SELECTED_NAME] = {
+        .obj_ptr = &objects.dl_home_unlock_user_select_name,
+        .buf = buf_lock_user_selected_name,
+        .buf_size = BUF_SIZE_LOCK_USER_SELECTED_NAME,
+    },
+    [UI_LABEL_ABS_LOCKED_USER_SELECTED_DATA] = {
+        .obj_ptr = &objects.dl_home_unlock_user_select_data,
+        .buf = buf_lock_user_selected_data,
+        .buf_size = BUF_SIZE_LOCK_USER_SELECTED_DATA,
+    },
+    [UI_LABEL_ABS_NOTCH_EXT_BAT] = {
+        .obj_ptr  = &objects.dtop_notch_exp_dat_bat_data,
+        .buf      = buf_notch_ext_bat,
+        .buf_size = BUF_SIZE_NOTCH_EXT_BAT,
+    },
+    
+    [UI_LABEL_ABS_LOCKED_USERS_1_NAME] = {
+        .obj_ptr  = &objects.dl_home_unlock_userpick_1_name,
+        .buf      = buf_users_1_name,
+        .buf_size = BUF_SIZE_USERS_1_NAME,
+    },
+    [UI_LABEL_ABS_LOCKED_USERS_1_DATA] = {
+        .obj_ptr  = &objects.dl_home_unlock_userpick_1_data,
+        .buf      = buf_users_1_data,
+        .buf_size = BUF_SIZE_USERS_1_DATA,
+    },
 
+    [UI_LABEL_ABS_LOCKED_USERS_2_NAME] = {
+        .obj_ptr  = &objects.dl_home_unlock_userpick_2_name,
+        .buf      = buf_users_2_name,
+        .buf_size = BUF_SIZE_USERS_2_NAME,
+    },
+    [UI_LABEL_ABS_LOCKED_USERS_2_DATA] = {
+        .obj_ptr  = &objects.dl_home_unlock_userpick_2_data,
+        .buf      = buf_users_2_data,
+        .buf_size = BUF_SIZE_USERS_2_DATA,
+    },
+
+    [UI_LABEL_ABS_LOCKED_USERS_3_NAME] = {
+        .obj_ptr  = &objects.dl_home_unlock_userpick_3_name,
+        .buf      = buf_users_3_name,
+        .buf_size = BUF_SIZE_USERS_3_NAME,
+    },
+    [UI_LABEL_ABS_LOCKED_USERS_3_DATA] = {
+        .obj_ptr  = &objects.dl_home_unlock_userpick_3_data,
+        .buf      = buf_users_3_data,
+        .buf_size = BUF_SIZE_USERS_3_DATA,
+    },
+
+    [UI_LABEL_ABS_LOCKED_USERS_4_NAME] = {
+        .obj_ptr  = &objects.dl_home_unlock_userpick_4_name,
+        .buf      = buf_users_4_name,
+        .buf_size = BUF_SIZE_USERS_4_NAME,
+    },
+    [UI_LABEL_ABS_LOCKED_USERS_4_DATA] = {
+        .obj_ptr  = &objects.dl_home_unlock_userpick_4_data,
+        .buf      = buf_users_4_data,
+        .buf_size = BUF_SIZE_USERS_4_DATA,
+    },
+
+    [UI_LABEL_ABS_LOCKED_USERS_5_NAME] = {
+        .obj_ptr  = &objects.dl_home_unlock_userpick_5_name,
+        .buf      = buf_users_5_name,
+        .buf_size = BUF_SIZE_USERS_5_NAME,
+    },
+    [UI_LABEL_ABS_LOCKED_USERS_5_DATA] = {
+        .obj_ptr  = &objects.dl_home_unlock_userpick_5_data,
+        .buf      = buf_users_5_data,
+        .buf_size = BUF_SIZE_USERS_5_DATA,
+    },
+
+    [UI_LABEL_ABS_LOCKED_USERS_6_NAME] = {
+        .obj_ptr  = &objects.dl_home_unlock_userpick_6_name,
+        .buf      = buf_users_6_name,
+        .buf_size = BUF_SIZE_USERS_6_NAME,
+    },
+    [UI_LABEL_ABS_LOCKED_USERS_6_DATA] = {
+        .obj_ptr  = &objects.dl_home_unlock_userpick_6_data,
+        .buf      = buf_users_6_data,
+        .buf_size = BUF_SIZE_USERS_6_DATA,
+    },
+    [UI_LABEL_ABS_LOCKED_PIN_MESSAGE] = {
+        .obj_ptr  = &objects.dl_home_unlock_pin_message,
+        .buf      = buf_lock_pin_message,
+        .buf_size = BUF_SIZE_LOCK_PIN_MESSAGE, 
+    },
     /* Add buff:
     [UI_LABEL_ABS_XXX] = {
         .obj_ptr  = &objects.xxx,
@@ -112,4 +244,13 @@ esp_err_t label_abs_prepare(ui_label_abs_id_t id,
     *out_buf = (const char *)e->buf;
 
     return ESP_OK;
+}
+esp_err_t ui_int__helper_label_abs_apply_sync(ui_label_abs_id_t id, const char *text) {
+    lv_obj_t *obj = NULL;
+    const char * buf = NULL;
+    esp_err_t ret = label_abs_prepare(id, text, &obj, &buf);
+    if(ret != ESP_OK) return ret;
+
+    lv_label_set_text_static(obj, buf);
+    return ret;
 }

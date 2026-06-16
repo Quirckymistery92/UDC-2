@@ -12,9 +12,11 @@ idf_component_register(
         esp_hw_support
         esp_lcd_touch_gsl3680
         ui
-        spiffs_controller
+        fatfs_controller
         jpegc_element
         i2c_controller
         rtc_rx8025t
         battery_guard
+        NVSm_sys
+        sys_modules
 )
