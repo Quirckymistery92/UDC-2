@@ -1,4 +1,7 @@
-/*
+/**
+ * @file display_lcd.h
+ * @brief LCD display helper API.
+ *
  * SPDX-FileCopyrightText: 2025
  * SPDX-License-Identifier: Apache-2.0
  *

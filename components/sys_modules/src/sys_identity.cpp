@@ -55,6 +55,7 @@ struct SysIdNode {
 
 struct SysIdAuthState {
     uint8_t failed_attempts;
+    uint8_t lock_layer;
     uint64_t lockout_until_ms;
 };
 
@@ -80,6 +81,9 @@ private:
     static constexpr uint32_t LOCKOUT_TIME_MS = 30000;
     static constexpr uint8_t MAX_FAILED_ATTEMPTS = 3;
     static constexpr uint16_t SYS_ID_USER_NONE = 0; 
+    static constexpr uint32_t LOCK_TIME_L1_MS = 30 * 1000;
+    static constexpr uint32_t LOCK_TIME_L2_MS = 5 * 60 * 1000;
+    static constexpr uint32_t LOCK_TIME_L3_MS = 15 * 60 * 1000;
 
     SysIdNode m_user_db[SYS_ID_MAX_USERS]{};
     SysIdAuthState m_auth_state[SYS_ID_MAX_USERS]{};
@@ -96,7 +100,9 @@ private:
     SemaphoreHandle_t m_mutex = nullptr;
     bool m_initialized = false;
 
-    IdentityManager() {}
+    IdentityManager() {
+        m_next_id = 1;
+    }
     static IdentityManager* s_instance;
 
     uint64_t getCurrentMs() const {
@@ -139,11 +145,10 @@ private:
             strlcpy(m_user_db[slot].record.public_data.name, "Invitado", SYS_ID_MAX_NAME_LEN);
             m_user_db[slot].record.public_data.permission = SYS_ID_PERM_GUEST;
             m_user_db[slot].record.public_data.avatar_id = UI_ICON_USER_LOGO_GUEST;
-            strlcpy(m_user_db[slot].record.pin, SYS_ID_USER_GUEST_PIN, strlen(SYS_ID_USER_GUEST_PIN));
+            strlcpy(m_user_db[slot].record.pin, SYS_ID_USER_GUEST_PIN, SYS_ID_MAX_PIN_LEN);
             m_user_db[slot].record.public_data.pin_length = strlen(SYS_ID_USER_GUEST_PIN); 
             m_user_db[slot].record.public_data.is_enabled = true;
-            strlcpy(m_user_db[slot].record.pin, "0000", SYS_ID_MAX_PIN_LEN);
-            ESP_LOGI(TAG, "Usuario Guest inyectado automaticamente.");
+            ESP_LOGI(TAG, "Usuario Guest agregado automaticamente.");
         }
     }
 
@@ -222,6 +227,10 @@ private:
                             // Prevenimos que el iterador pise IDs reservados.
                             if (m_user_db[i].record.public_data.id >= m_next_id) {
                                 m_next_id = m_user_db[i].record.public_data.id + 1;
+
+                                if (m_next_id == SYS_ID_USER_NONE) {
+                                    m_next_id = 1;
+                                }
                             }
                         }
                     }
@@ -247,177 +256,235 @@ private:
     }
 
     void runCoreLoop() {
-        SysCmdMsg cmd;
-        bool trigger_db_save;
-        bool trigger_ui_update;
+      SysCmdMsg cmd;
+      bool trigger_db_save;
+      bool trigger_ui_update;
 
-        while (true) {
-            if (xQueueReceive(m_queue, &cmd, portMAX_DELAY) == pdTRUE) {
-                xSemaphoreTake(m_mutex, portMAX_DELAY);
-                trigger_db_save = false;
-                trigger_ui_update = false;
+      while (true) {
+        if (xQueueReceive(m_queue, &cmd, portMAX_DELAY) == pdTRUE) {
+          xSemaphoreTakeRecursive(m_mutex, portMAX_DELAY);
+          trigger_db_save = false;
+          trigger_ui_update = false;
 
-                switch (cmd.type) {
-                    case CmdType::REQ_LOGIN:
-                    case CmdType::REQ_VALIDATE: {
-                        uint64_t now_ms = getCurrentMs();
-                        int16_t idx = findIndexById(cmd.user_id);
+          switch (cmd.type) {
+          case CmdType::REQ_LOGIN:
+          case CmdType::REQ_VALIDATE: {
+            uint64_t now_ms = getCurrentMs();
+            int16_t idx = findIndexById(cmd.user_id);
 
-                        if (idx < 0) {
-                            if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_NOT_FOUND, cmd.user_id, cmd.ctx);
-                        } else if (!m_user_db[idx].record.public_data.is_enabled) {
-                            if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_DISABLED, cmd.user_id, cmd.ctx);
-                        } else if (now_ms < m_auth_state[idx].lockout_until_ms) {
-                            if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_LOCKED, cmd.user_id, cmd.ctx);
-                        } else {
-                            bool pin_ok = (strcmp(m_user_db[idx].record.pin, cmd.payload.pin) == 0);
+            if (idx < 0) {
+              if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_NOT_FOUND, cmd.user_id, cmd.ctx);
+            } else if (!m_user_db[idx].record.public_data.is_enabled || m_auth_state[idx].lock_layer >= 4) {
+              if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_LOCKED, cmd.user_id, cmd.ctx);
+            } else if (m_auth_state[idx].lock_layer > 0 && now_ms < m_auth_state[idx].lockout_until_ms) {
+              if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_TEMP_LOCKED, cmd.user_id, cmd.ctx);
+            } else {
+              bool pin_ok = (strcmp(m_user_db[idx].record.pin, cmd.payload.pin) == 0);
 
-                            if (pin_ok) {
-                                m_auth_state[idx].failed_attempts = 0;
-                                m_auth_state[idx].lockout_until_ms = 0;
-                                if (cmd.type == CmdType::REQ_LOGIN) m_active_user = cmd.user_id;
-                                if (cmd.cb) cmd.cb(SYS_ID_EVT_SUCCESS, cmd.user_id, cmd.ctx);
-                            } else {
-                                m_auth_state[idx].failed_attempts++;
-                                if (m_auth_state[idx].failed_attempts >= MAX_FAILED_ATTEMPTS) {
-                                    m_auth_state[idx].lockout_until_ms = now_ms + LOCKOUT_TIME_MS;
-                                    if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_LOCKED, cmd.user_id, cmd.ctx);
-                                } else {
-                                    if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_WRONG_PIN, cmd.user_id, cmd.ctx);
-                                }
-                            }
-                        }
-                        break;
-                    }
+              if (pin_ok) {
+                m_auth_state[idx].failed_attempts = 0;
+                m_auth_state[idx].lock_layer = 0;
+                m_auth_state[idx].lockout_until_ms = 0;
 
-                    case CmdType::REQ_LOGIN_FACE: {
-                        if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_INTERNAL, cmd.user_id, cmd.ctx);
-                        break;
-                    }
+                if (cmd.type == CmdType::REQ_LOGIN) {
+                  m_active_user = cmd.user_id;
+                  if (m_global_bridge_cb) m_global_bridge_cb(SYS_ID_EVT_GLOBAL_LOGIN);
+                } 
+                if (cmd.cb) cmd.cb(SYS_ID_EVT_SUCCESS, cmd.user_id, cmd.ctx);
+                
+              } else {
+                m_auth_state[idx].failed_attempts++;
 
-                    case CmdType::REQ_LOGOUT: {
-                        if (m_active_user != SYS_ID_USER_NONE) {
-                            m_last_user = m_active_user;
-                            m_active_user = SYS_ID_USER_NONE; 
-                            if (m_global_bridge_cb) m_global_bridge_cb(SYS_ID_EVT_GLOBAL_LOGOUT);
-                        }
-                        if (cmd.cb) cmd.cb(SYS_ID_EVT_SUCCESS, 0, cmd.ctx);
-                        break;
-                    }
+                if (m_auth_state[idx].failed_attempts >= MAX_FAILED_ATTEMPTS) {
+                  m_auth_state[idx].failed_attempts = 0;
+                  m_auth_state[idx].lock_layer++;
 
-                    case CmdType::REQ_CREATE: {
-                        size_t input_pin_len = strlen(cmd.payload.create_data.pin);
-                        if (input_pin_len < SYS_ID_MIN_PIN_VAL || input_pin_len > SYS_ID_MAX_PIN_VAL) {
-                            ESP_LOGW(TAG, "Rechazado: PIN de longitud invalida (%d)", input_pin_len);
-                            if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_WRONG_PIN, 0, cmd.ctx);
-                            break;
-                        }
+                  if (m_auth_state[idx].lock_layer == 1) {
+                    m_auth_state[idx].lockout_until_ms = now_ms + LOCK_TIME_L1_MS;
+                    if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_TEMP_LOCKED, cmd.user_id, cmd.ctx);
+                  } else if (m_auth_state[idx].lock_layer == 2) {
+                    m_auth_state[idx].lockout_until_ms = now_ms + LOCK_TIME_L2_MS;
+                    if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_TEMP_LOCKED, cmd.user_id, cmd.ctx);
+                  } else if (m_auth_state[idx].lock_layer == 3) {
+                    m_auth_state[idx].lockout_until_ms = now_ms + LOCK_TIME_L3_MS;
+                    if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_TEMP_LOCKED, cmd.user_id, cmd.ctx);
+                  } else {
+                    m_user_db[idx].record.public_data.is_enabled = false;
+                    m_auth_state[idx].lock_layer = 4;
 
-                        int16_t slot = findFreeSlot();
-                        if (slot >= 0) {
-                            uint16_t new_id = m_next_id++;
-                            if (new_id == SYS_ID_USER_GUEST) new_id = m_next_id++; // Evitamos colisión
-
-                            m_user_db[slot].record.public_data.id = new_id;
-                            strlcpy(m_user_db[slot].record.public_data.name, cmd.payload.create_data.name, SYS_ID_MAX_NAME_LEN);
-                            strlcpy(m_user_db[slot].record.pin, cmd.payload.create_data.pin, SYS_ID_MAX_PIN_LEN);
-                            m_user_db[slot].record.public_data.permission = cmd.payload.create_data.permission;
-                            m_user_db[slot].record.public_data.avatar_id = cmd.payload.create_data.avatar_id;
-                            m_user_db[slot].record.public_data.pin_length = input_pin_len;
-                            m_user_db[slot].record.public_data.is_enabled = true;
-                            m_user_db[slot].is_used = true;
-                            memset(&m_auth_state[slot], 0, sizeof(SysIdAuthState));
-
-                            trigger_db_save = true; trigger_ui_update = true;
-                            if (cmd.cb) cmd.cb(SYS_ID_EVT_SUCCESS, m_user_db[slot].record.public_data.id, cmd.ctx);
-                        } else {
-                            if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_DB_FULL, 0, cmd.ctx);
-                        }
-                        break;
-                    }
-
-                    case CmdType::REQ_DELETE: {
-                        // PROTECCIÓN: No se puede eliminar a sí mismo estando logueado.
-                        if (cmd.user_id == m_active_user) {
-                            ESP_LOGE(TAG, "Operacion rechazada: No se puede eliminar el usuario activo (ID: %d). Debe cerrar sesion primero.", cmd.user_id);
-                            // Se asume un evento de error, pero la base de datos queda intacta.
-                            if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_LOCKED, cmd.user_id, cmd.ctx); 
-                            break;
-                        }
-
-                        int16_t idx = findIndexById(cmd.user_id);
-                        if (idx >= 0) {
-                            m_user_db[idx].is_used = false;
-                            
-                            trigger_db_save = true; trigger_ui_update = true;
-                            enforceMinimumUsers();
-                            
-                            if (cmd.cb) cmd.cb(SYS_ID_EVT_SUCCESS, cmd.user_id, cmd.ctx);
-                        } else {
-                            if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_NOT_FOUND, cmd.user_id, cmd.ctx);
-                        }
-                        break;
-                    }
-
-                    case CmdType::REQ_GUEST_TOGGLE: {
-                        int16_t idx = findIndexById(SYS_ID_USER_GUEST);
-                        if (idx >= 0) {
-                            m_user_db[idx].record.public_data.is_enabled = cmd.payload.toggle_state;
-                        } else if (cmd.payload.toggle_state) {
-                            injectGuest();
-                        }
-                        
-                        trigger_db_save = true; trigger_ui_update = true;
-                        if (!cmd.payload.toggle_state && enforceMinimumUsers()) {
-                            ESP_LOGW(TAG, "Revertido: El sistema no puede quedar vacio.");
-                        }
-
-                        if (cmd.cb) cmd.cb(SYS_ID_EVT_SUCCESS, SYS_ID_USER_GUEST, cmd.ctx);
-                        break;
-                    }
-
-                    case CmdType::REQ_SORTED_VIEW: {
-                        if (cmd.payload.view_cb) {
-                            // Buffer de copias alineadas (Soluciona el -Waddress-of-packed-member)
-                            sys_id_user_view_t unpacked_views[SYS_ID_MAX_USERS];
-                            sys_id_user_view_t* view_array[SYS_ID_MAX_USERS];
-                            uint16_t count = 0;
-
-                            for (int i = 0; i < SYS_ID_MAX_USERS; i++) {
-                                if (m_user_db[i].is_used) {
-                                    // 1. Copiamos por valor el struct empaquetado al normal
-                                    unpacked_views[count] = m_user_db[i].record.public_data;
-                                    // 2. Asignamos el string relativo
-                                    unpacked_views[count].role_str = getPermissionString(unpacked_views[count].permission);
-                                    // 3. Guardamos el puntero SEGURO
-                                    view_array[count] = &unpacked_views[count];
-                                    count++;
-                                }
-                            }
-                            
-                            // Ordenamiento simple para N pequeño (Soluciona el -Werror=array-bounds de std::sort)
-                            for (uint16_t i = 0; i < count; i++) {
-                                for (uint16_t j = i + 1; j < count; j++) {
-                                    if (view_array[j]->id < view_array[i]->id) {
-                                        sys_id_user_view_t* temp = view_array[i];
-                                        view_array[i] = view_array[j];
-                                        view_array[j] = temp;
-                                    }
-                                }
-                            }
-                            
-                            cmd.payload.view_cb(view_array, count, cmd.ctx);
-                        }
-                        break;
-                    }
+                    trigger_db_save = true; 
+                    trigger_ui_update = true;
+                    if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_LOCKED, cmd.user_id, cmd.ctx);
+                  }
+                } else {
+                  if (cmd.cb) cmd.cb(SYS_ID_EVT_ERR_WRONG_PIN, cmd.user_id, cmd.ctx);
                 }
-
-                xSemaphoreGive(m_mutex);
-
-                if (trigger_db_save) saveDb();
-                if (trigger_ui_update && m_global_bridge_cb) m_global_bridge_cb(SYS_ID_EVT_GLOBAL_DB_CHANGED);
+              }
             }
+            break;
+          }
+          case CmdType::REQ_LOGIN_FACE: {
+            if (cmd.cb)
+              cmd.cb(SYS_ID_EVT_ERR_INTERNAL, cmd.user_id, cmd.ctx);
+            break;
+          }
+
+          case CmdType::REQ_LOGOUT: {
+            if (m_active_user != SYS_ID_USER_NONE) {
+              m_last_user = m_active_user;
+              m_active_user = SYS_ID_USER_NONE;
+              if (m_global_bridge_cb)
+                m_global_bridge_cb(SYS_ID_EVT_GLOBAL_LOGOUT);
+            }
+            if (cmd.cb)
+              cmd.cb(SYS_ID_EVT_SUCCESS, 0, cmd.ctx);
+            break;
+          }
+
+          case CmdType::REQ_CREATE: {
+            size_t input_pin_len = strlen(cmd.payload.create_data.pin);
+            if (input_pin_len < SYS_ID_MIN_PIN_VAL ||
+                input_pin_len > SYS_ID_MAX_PIN_VAL) {
+              ESP_LOGW(TAG, "Rechazado: PIN de longitud invalida (%d)",
+                       input_pin_len);
+              if (cmd.cb)
+                cmd.cb(SYS_ID_EVT_ERR_WRONG_PIN, 0, cmd.ctx);
+              break;
+            }
+
+            int16_t slot = findFreeSlot();
+            if (slot >= 0) {
+              if (m_next_id == SYS_ID_USER_NONE) {
+                  m_next_id = 1;
+              }
+              uint16_t new_id = m_next_id++;
+              if (new_id == SYS_ID_USER_GUEST)
+                new_id = m_next_id++;
+
+              m_user_db[slot].record.public_data.id = new_id;
+              strlcpy(m_user_db[slot].record.public_data.name,
+                      cmd.payload.create_data.name, SYS_ID_MAX_NAME_LEN);
+              strlcpy(m_user_db[slot].record.pin, cmd.payload.create_data.pin,
+                      SYS_ID_MAX_PIN_LEN);
+              m_user_db[slot].record.public_data.permission =
+                  cmd.payload.create_data.permission;
+              m_user_db[slot].record.public_data.avatar_id =
+                  cmd.payload.create_data.avatar_id;
+              m_user_db[slot].record.public_data.pin_length = input_pin_len;
+              m_user_db[slot].record.public_data.is_enabled = true;
+              m_user_db[slot].is_used = true;
+              memset(&m_auth_state[slot], 0, sizeof(SysIdAuthState));
+
+              trigger_db_save = true;
+              trigger_ui_update = true;
+              if (cmd.cb)
+                cmd.cb(SYS_ID_EVT_SUCCESS,
+                       m_user_db[slot].record.public_data.id, cmd.ctx);
+            } else {
+              if (cmd.cb)
+                cmd.cb(SYS_ID_EVT_ERR_DB_FULL, 0, cmd.ctx);
+            }
+            break;
+          }
+
+          case CmdType::REQ_DELETE: {
+            // PROTECCIÓN: No se puede eliminar a sí mismo estando logueado.
+            if (cmd.user_id == m_active_user) {
+              ESP_LOGE(TAG,
+                       "Operacion rechazada: No se puede eliminar el usuario "
+                       "activo (ID: %d). Debe cerrar sesion primero.",
+                       cmd.user_id);
+              // Se asume un evento de error, pero la base de datos queda
+              // intacta.
+              if (cmd.cb)
+                cmd.cb(SYS_ID_EVT_ERR_LOCKED, cmd.user_id, cmd.ctx);
+              break;
+            }
+
+            int16_t idx = findIndexById(cmd.user_id);
+            if (idx >= 0) {
+              m_user_db[idx].is_used = false;
+
+              trigger_db_save = true;
+              trigger_ui_update = true;
+              enforceMinimumUsers();
+
+              if (cmd.cb)
+                cmd.cb(SYS_ID_EVT_SUCCESS, cmd.user_id, cmd.ctx);
+            } else {
+              if (cmd.cb)
+                cmd.cb(SYS_ID_EVT_ERR_NOT_FOUND, cmd.user_id, cmd.ctx);
+            }
+            break;
+          }
+
+          case CmdType::REQ_GUEST_TOGGLE: {
+            int16_t idx = findIndexById(SYS_ID_USER_GUEST);
+            if (idx >= 0) {
+              m_user_db[idx].record.public_data.is_enabled =
+                  cmd.payload.toggle_state;
+            } else if (cmd.payload.toggle_state) {
+              injectGuest();
+            }
+
+            trigger_db_save = true;
+            trigger_ui_update = true;
+            if (!cmd.payload.toggle_state && enforceMinimumUsers()) {
+              ESP_LOGW(TAG, "Revertido: El sistema no puede quedar vacio.");
+            }
+
+            if (cmd.cb)
+              cmd.cb(SYS_ID_EVT_SUCCESS, SYS_ID_USER_GUEST, cmd.ctx);
+            break;
+          }
+
+          case CmdType::REQ_SORTED_VIEW: {
+            if (cmd.payload.view_cb) {
+              // Buffer de copias alineadas (Soluciona el
+              // -Waddress-of-packed-member)
+              sys_id_user_view_t unpacked_views[SYS_ID_MAX_USERS];
+              sys_id_user_view_t *view_array[SYS_ID_MAX_USERS];
+              uint16_t count = 0;
+
+              for (int i = 0; i < SYS_ID_MAX_USERS; i++) {
+                if (m_user_db[i].is_used) {
+                  // 1. Copiamos por valor el struct empaquetado al normal
+                  unpacked_views[count] = m_user_db[i].record.public_data;
+                  // 2. Asignamos el string relativo
+                  unpacked_views[count].role_str =
+                      getPermissionString(unpacked_views[count].permission);
+                  // 3. Guardamos el puntero SEGURO
+                  view_array[count] = &unpacked_views[count];
+                  count++;
+                }
+              }
+
+              // Ordenamiento simple para N pequeño (Soluciona el
+              // -Werror=array-bounds de std::sort)
+              for (uint16_t i = 0; i < count; i++) {
+                for (uint16_t j = i + 1; j < count; j++) {
+                  if (view_array[j]->id < view_array[i]->id) {
+                    sys_id_user_view_t *temp = view_array[i];
+                    view_array[i] = view_array[j];
+                    view_array[j] = temp;
+                  }
+                }
+              }
+
+              cmd.payload.view_cb(view_array, count, cmd.ctx);
+            }
+            break;
+          }
+          }
+
+          xSemaphoreGiveRecursive(m_mutex);
+
+          if (trigger_db_save)
+            saveDb();
+          if (trigger_ui_update && m_global_bridge_cb)
+            m_global_bridge_cb(SYS_ID_EVT_GLOBAL_DB_CHANGED);
         }
+      }
     }
 
 public:
@@ -433,7 +500,7 @@ public:
         if (m_initialized) return ESP_OK;
         
         m_global_bridge_cb = bridge_cb;
-        m_mutex = xSemaphoreCreateMutex();
+        m_mutex = xSemaphoreCreateRecursiveMutex();
         m_queue = xQueueCreate(CMD_QUEUE_SIZE, sizeof(SysCmdMsg));
         m_initialized = true; 
 
@@ -451,48 +518,114 @@ public:
 
     uint16_t getActiveUser() const {
         if (!m_initialized) return SYS_ID_USER_NONE;
-        xSemaphoreTake(m_mutex, portMAX_DELAY);
+        xSemaphoreTakeRecursive(m_mutex, portMAX_DELAY);
         uint16_t id = m_active_user;
-        xSemaphoreGive(m_mutex);
+        xSemaphoreGiveRecursive(m_mutex);
         return id;
     }
 
     uint16_t getLastUser() const {
         if (!m_initialized) return SYS_ID_USER_NONE;
-        xSemaphoreTake(m_mutex, portMAX_DELAY);
+        xSemaphoreTakeRecursive(m_mutex, portMAX_DELAY);
         // Si nadie está activo ahora, retornamos el último que lo estuvo (o NONE si nunca hubo nadie)
         uint16_t id = (m_active_user != SYS_ID_USER_NONE) ? m_active_user : m_last_user;
-        xSemaphoreGive(m_mutex);
+        xSemaphoreGiveRecursive(m_mutex);
         return id;
     }
 
     bool isGuestEnabled() const {
         if (!m_initialized) return false;
         bool enabled = false;
-        xSemaphoreTake(m_mutex, portMAX_DELAY);
+        xSemaphoreTakeRecursive(m_mutex, portMAX_DELAY);
         int16_t idx = findIndexById(SYS_ID_USER_GUEST);
         if (idx >= 0) enabled = m_user_db[idx].record.public_data.is_enabled;
-        xSemaphoreGive(m_mutex);
+        xSemaphoreGiveRecursive(m_mutex);
         return enabled;
     }
 
     esp_err_t getUserData(uint16_t user_id, sys_id_user_view_t* out_data) const {
         if (!m_initialized || !out_data || user_id == SYS_ID_USER_NONE) return ESP_ERR_INVALID_STATE;
         esp_err_t ret = ESP_ERR_NOT_FOUND;
-        xSemaphoreTake(m_mutex, portMAX_DELAY);
+        xSemaphoreTakeRecursive(m_mutex, portMAX_DELAY);
         int16_t idx = findIndexById(user_id);
         if (idx >= 0) {
             *out_data = m_user_db[idx].record.public_data;
             out_data->role_str = getPermissionString(out_data->permission);
             ret = ESP_OK;
         }
-        xSemaphoreGive(m_mutex);
+        xSemaphoreGiveRecursive(m_mutex);
         return ret;
     }
 
-    esp_err_t enqueueCommand(SysCmdMsg& cmd) {
-        if (!m_initialized) return ESP_ERR_INVALID_STATE;
-        return (xQueueSend(m_queue, &cmd, 0) == pdTRUE) ? ESP_OK : ESP_FAIL;
+    esp_err_t enqueueCommand(SysCmdMsg &cmd) {
+      if (!m_initialized)
+        return ESP_ERR_INVALID_STATE;
+      return (xQueueSend(m_queue, &cmd, 0) == pdTRUE) ? ESP_OK : ESP_FAIL;
+    }
+
+    const char *getLockMessage(uint16_t user_id) const {
+        if (!m_initialized) return "";
+        const char *msg = "";
+
+        xSemaphoreTakeRecursive(m_mutex, portMAX_DELAY);
+        int16_t idx = findIndexById(user_id);
+        
+        if (idx >= 0) {
+            if (!m_user_db[idx].record.public_data.is_enabled || m_auth_state[idx].lock_layer >= 4) {
+                msg = SYS_ID_MSG_LOCK_PERMA; 
+            } 
+            else if (m_auth_state[idx].lock_layer > 0) {
+                if (getCurrentMs() < m_auth_state[idx].lockout_until_ms) {
+                    switch (m_auth_state[idx].lock_layer) {
+                        case 1: msg = SYS_ID_MSG_LOCK_L1; break;
+                        case 2: msg = SYS_ID_MSG_LOCK_L2; break;
+                        case 3: msg = SYS_ID_MSG_LOCK_L3; break;
+                    }
+                }
+            }
+        }
+        xSemaphoreGiveRecursive(m_mutex);
+        return msg;
+    }
+
+    bool getLockState_isLock(uint16_t user_id) {
+        if (!m_initialized) return false;
+        
+        bool is_locked = false;
+        xSemaphoreTakeRecursive(m_mutex, portMAX_DELAY);
+        int16_t idx = findIndexById(user_id);
+        
+        if (idx >= 0) {
+            if (!m_user_db[idx].record.public_data.is_enabled || m_auth_state[idx].lock_layer >= 4) {
+                is_locked = true;
+            } 
+            else if (m_auth_state[idx].lock_layer > 0) {
+                if (getCurrentMs() < m_auth_state[idx].lockout_until_ms) {
+                    is_locked = true;
+                } else {
+                    is_locked = false;
+                }
+            }
+        }
+        xSemaphoreGiveRecursive(m_mutex);
+        return is_locked;
+    }
+
+    uint32_t getLockRemainingMs(uint16_t user_id) {
+        if (!m_initialized) return 0;
+        uint32_t remaining = 0;
+
+        xSemaphoreTakeRecursive(m_mutex, portMAX_DELAY);
+        
+        int16_t idx = findIndexById(user_id);
+        if (idx >= 0 && m_auth_state[idx].lock_layer > 0 && m_auth_state[idx].lock_layer < 4) {
+            uint64_t now = getCurrentMs();
+            if (now < m_auth_state[idx].lockout_until_ms) {
+                remaining = (uint32_t)(m_auth_state[idx].lockout_until_ms - now);
+            }
+        }
+        xSemaphoreGiveRecursive(m_mutex);
+        return remaining;
     }
 };
 
@@ -509,6 +642,9 @@ esp_err_t sys_id_init(sys_id_global_cb_t ui_bridge_listener) {
 }
 
 uint16_t sys_id_sess_get_active(void) { return IdentityManager::getInstance().getActiveUser(); }
+const char* sys_id_auth_get_lock_msg(uint16_t user_id) { return IdentityManager::getInstance().getLockMessage(user_id); }
+bool sys_id_auth_get_lock_temp_isLocked(uint16_t user_id) { return IdentityManager::getInstance().getLockState_isLock(user_id); }
+uint32_t sys_id_auth_get_lock_remaining_ms(uint16_t user_id) { return IdentityManager::getInstance().getLockRemainingMs(user_id); }
 uint16_t sys_id_sess_get_last(void) { return IdentityManager::getInstance().getLastUser(); }
 bool sys_id_user_guest_is_enabled(void) { return IdentityManager::getInstance().isGuestEnabled(); }
 
@@ -517,7 +653,7 @@ esp_err_t sys_id_user_get_data(uint16_t user_id, sys_id_user_view_t *out_data) {
 }
 
 esp_err_t sys_id_sess_req_login(uint16_t user_id, const char *pin, sys_id_cb_t cb, void *ctx) {
-    SysCmdMsg cmd{}; // Inicializa en ceros de forma segura (Fix warning)
+    SysCmdMsg cmd{};
     cmd.type = CmdType::REQ_LOGIN;
     cmd.user_id = user_id;
     cmd.cb = cb;

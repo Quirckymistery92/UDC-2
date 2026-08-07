@@ -90,11 +90,11 @@ esp_err_t ui_screen_change(ScreensEnum screen_id,
 }
 
 // Método Asíncrono para actualizar fondo de pantalla de Home
-esp_err_t ui_async_screen_backg_update(ui_backg_img_t img, lv_obj_t *obj)
+esp_err_t ui_async_screen_backg_update_DSHOME(ui_backg_img_t img, lv_obj_t *obj)
 {
     const char *image_path = ui_backg_img_to_path(img);
     if (!image_path) return ESP_ERR_INVALID_ARG;
-    return ui_pub_actions_backg_update(image_path, obj);
+    return ui_pub_actions_backg_update_DSHOME(image_path);
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -319,6 +319,64 @@ esp_err_t ui_obj_set_hidden(lv_obj_t *obj, bool hidden)
     return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
 }
 /* ══════════════════════════════════════════════════════════════════
+ *  Timer
+ * ══════════════════════════════════════════════════════════════════ */
+esp_err_t ui_timer_control(lv_timer_t *timer, bool pause) {
+  if (!timer)
+    return ESP_ERR_INVALID_ARG;
+  lvgl_msg_t msg = {
+      .cmd = LVGL_CMD_TIMER_CONTROL,
+      .data.timer_resume = {.timer = timer, .extra.apply_pause = pause},
+  };
+  return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
+}
+esp_err_t ui_timer_set_period(lv_timer_t *timer, uint32_t period) {
+  if (!timer)
+    return ESP_ERR_INVALID_ARG;
+  lvgl_msg_t msg = {
+      .cmd = LVGL_CMD_TIMER_SET_PERIOD,
+      .data.timer_resume = {.timer = timer, .extra.period = period},
+  };
+  return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
+}
+esp_err_t ui_timer_reset(lv_timer_t *timer) {
+  if (!timer)
+    return ESP_ERR_INVALID_ARG;
+  lvgl_msg_t msg = {
+      .cmd = LVGL_CMD_TIMER_RESET,
+      .data.timer_resume = {.timer = timer},
+  };
+  return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
+}
+esp_err_t ui_timer_set_repeat_count(lv_timer_t *timer, uint32_t repeat_count) {
+  if (!timer)
+    return ESP_ERR_INVALID_ARG;
+  lvgl_msg_t msg = {
+      .cmd = LVGL_CMD_TIMER_SET_REPEAT_COUNT,
+      .data.timer_resume = {.timer = timer, .extra.repeat_count = repeat_count},
+  };
+  return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
+}
+esp_err_t ui_timer_set_auto_delete(lv_timer_t *timer, bool auto_delete) {
+  if (!timer)
+    return ESP_ERR_INVALID_ARG;
+  lvgl_msg_t msg = {
+      .cmd = LVGL_CMD_TIMER_SET_AUTO_DELETE,
+      .data.timer_resume = {.timer = timer, .extra.auto_delete = auto_delete},
+  };
+  return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
+}
+
+esp_err_t ui_timer_set_user_data(lv_timer_t *timer, void *user_data) {
+  if (!timer)
+    return ESP_ERR_INVALID_ARG;
+  lvgl_msg_t msg = {
+      .cmd = LVGL_CMD_TIMER_SET_USER_DATA,
+      .data.timer_resume = {.timer = timer, .extra.user_data = user_data},
+  };
+  return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
+}
+/* ══════════════════════════════════════════════════════════════════
  *  Specific
  * ══════════════════════════════════════════════════════════════════ */
 esp_err_t ui_battery_set_data(int percentage, int voltage_mv, bool is_charging)
@@ -340,6 +398,22 @@ bool ui_display_is_created_ds_top(void) {
 }
 bool ui_display_is_created_ds_locked(void) {
     return ui_int__is_screen_created_ds_locked();
+}
+esp_err_t ui_spc_send_notify_user(bool is_alert, const char *fmt, ...)
+{
+    if (!fmt) return ESP_ERR_INVALID_ARG;
+
+    lvgl_msg_t msg = {
+        .cmd = LVGL_CMD_SPC_NOTIFICATION_SHOW,
+        .data.spc_notification_show = { .is_alert = is_alert },
+    };
+
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(msg.data.spc_notification_show.msg, sizeof(msg.data.spc_notification_show.msg), fmt, args);
+    va_end(args);
+
+    return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
 }
 /* ══════════════════════════════════════════════════════════════════
  *  Backlight (direct, no queue)

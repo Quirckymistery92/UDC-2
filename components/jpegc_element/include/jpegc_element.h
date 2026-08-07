@@ -1,3 +1,13 @@
+/**
+ * @file jpegc_element.h
+ * @brief Interfaz del decodificador JPEG asíncrono para imágenes LVGL.
+ *
+ * Declara la configuración del decodificador, los formatos de salida, los
+ * callbacks de finalización y las funciones para crear handles y encolar
+ * trabajos de decodificación. El procesamiento se ejecuta en una tarea
+ * interna y los buffers de salida se gestionan en PSRAM.
+ */
+
 #pragma once
 
 #include <stdint.h>
@@ -19,8 +29,17 @@ typedef struct jpegc_element_t *jpegc_element_handle_t;
 
 /* ── Callbacks ────────────────────────────────────────────────────────────── */
 
-/** Called from the decode task immediately before decoding starts. */
-typedef void (*jpegc_element_cb_pre_t)(void);
+/**
+ * @brief Called from the decode task immediately BEFORE decoding starts.
+ *
+ * CRITICAL: Use this callback to signal LVGL to release the previous image.
+ * For example, call lv_image_set_src(obj, NULL) to clear the old descriptor
+ * from the display before the new decode begins. This prevents LVGL from
+ * reading stale buffer data while this handle is reused for a new decode.
+ *
+ * @note If this is the first decode on the handle, no previous image exists.
+ */
+typedef void (*jpegc_element_cb_pre_t)(lv_obj_t *target);
 
 /** Payload delivered to the post-decode callback. */
 typedef struct {
@@ -29,7 +48,16 @@ typedef struct {
     lv_obj_t     *target_obj; /**< Optional LVGL object passed in process_data                  */
 } jpegc_element_cb_post_data_t;
 
-/** Called from the decode task once decoding is complete (or failed). */
+/**
+ * @brief Called from the decode task once decoding is complete (or failed).
+ *
+ * CRITICAL: On success (result == ESP_OK), call lv_image_set_src(target_obj, img_dsc)
+ * to attach the newly decoded image to the LVGL object. The img_dsc pointer is stable
+ * and owned by this handle for its entire lifetime. LVGL will hold a reference to it
+ * until you call the pre_cb on the next decode (or cleanup the handle).
+ *
+ * @note On failure, do not use img_dsc; check the result code first.
+ */
 typedef void (*jpegc_element_cb_post_t)(jpegc_element_cb_post_data_t *data);
 
 /* ── Output format ────────────────────────────────────────────────────────── */
@@ -141,6 +169,14 @@ esp_err_t jpegc_element_process(jpegc_element_handle_t       handle,
  * the handle to an unconfigured state (equivalent to a freshly created but
  * unconfigured handle).  The handle struct itself is NOT freed; only
  * jpegc_element_deinit() frees all handle memory.
+ *
+ * CRITICAL PRECONDITION: Before calling cleanup, ensure LVGL no longer holds
+ * a reference to the descriptor. Either:
+ *   a) Call the pre_cb directly to signal LVGL to release the image, OR
+ *   b) Know that no LVGL object is currently displaying the image.
+ *
+ * Calling cleanup while LVGL is actively rendering the buffer will cause
+ * use-after-free and heap corruption.
  *
  * @note The handle cannot be reused after cleanup without calling deinit and
  *       re-initialising the subsystem.

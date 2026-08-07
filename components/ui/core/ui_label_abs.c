@@ -1,49 +1,24 @@
-/*
- * SPDX-FileCopyrightText: 2025
- * SPDX-License-Identifier: Apache-2.0
- *
- * ui_label_abs — Implementación
- *
- * Tabla interna de buffers estáticos en PSRAM para labels dinámicos.
- * Los buffers se ubican en PSRAM mediante EXT_RAM_BSS_ATTR, garantizando
- * asignación estática en compile/link time — sin malloc, sin fragmentación.
- *
- * ─── CÓMO AGREGAR UN NUEVO LABEL ────────────────────────────────────────────
- *
- *  1. En include/ui_manager.h, agregar el ID al enum ui_label_abs_id_t:
- *         UI_LABEL_ABS_MI_LABEL,
- *
- *  2. Aquí, definir el tamaño del buffer:
- *         #define BUF_SIZE_MI_LABEL   N   // N = max chars + 1 (null terminator)
- *
- *  3. Declarar el buffer estático en PSRAM:
- *         static EXT_RAM_BSS_ATTR char buf_mi_label[BUF_SIZE_MI_LABEL];
- *
- *  4. Agregar la entry en s_table[]:
- *         [UI_LABEL_ABS_MI_LABEL] = {
- *             .obj_ptr  = &objects.mi_label,
- *             .buf      = buf_mi_label,
- *             .buf_size = BUF_SIZE_MI_LABEL,
- *         },
- *  5: listo xd
- * ────────────────────────────────────────────────────────────────────────────
- */
+/* ══════════════════════════════════════════════════════════════════
+ * ══════════════════════════════════════════════════════════════════ 
+ *                   ui_label_abs.c Implementación
+ * ══════════════════════════════════════════════════════════════════ 
+ * ══════════════════════════════════════════════════════════════════ */
 
 #include "ui_label_abs.h"
-#include "../screens/screens.h"   /* objects_t, extern objects */
+#include "../screens/screens.h"
 #include <string.h>
 #include "esp_attr.h"
 #include "esp_log.h"
-
-static const char *TAG = "label_abs";
+#include <stdarg.h>
+#include <stdio.h>
+static const char *TAG = "ABS Text";
 
 /* ══════════════════════════════════════════════════════════════════
- *  Tamaños de buffer por label (compile time)
+ *                  Tamaños de buffer por label
  * ══════════════════════════════════════════════════════════════════ */
-
-#define BUF_SIZE_NOTCH_HOUR   12   /* "HH:MM:SS\0" + margen = 12 */
+#define BUF_SIZE_NOTCH_HOUR   12 
 #define BUF_SIZE_NOTCH_EXT_BAT 17
-#define BUF_SIZE_LOCK_USER_SELECTED_NAME 16
+#define BUF_SIZE_LOCK_USER_SELECTED_NAME 32
 #define BUF_SIZE_LOCK_USER_SELECTED_DATA 28
 
 #define BUF_SIZE_USERS_1_NAME 16
@@ -65,13 +40,17 @@ static const char *TAG = "label_abs";
 #define BUF_SIZE_USERS_6_DATA 28
 
 #define BUF_SIZE_LOCK_PIN_MESSAGE 64
-/* Add buff: #define BUF_SIZE_XXX   N */
+
+#define BUF_SIZE_DTOP_POPUP_TAG 32
+#define BUF_SIZE_DTOP_POPUP_MESSAGE 128
+
+#define BUF_SIZE_DTOP_NOTIFY_USER 256
+
+#define BUF_SIZE_HOME_USER_LOGGED_NAME 32
 
 /* ══════════════════════════════════════════════════════════════════
- *  Buffers estáticos en PSRAM
- *  EXT_RAM_BSS_ATTR → segmento .ext_ram.bss → PSRAM, sin malloc
+ *                  Buffers estáticos en PSRAM
  * ══════════════════════════════════════════════════════════════════ */
-
 static EXT_RAM_BSS_ATTR char buf_notch_hour[BUF_SIZE_NOTCH_HOUR];
 static EXT_RAM_BSS_ATTR char buf_notch_ext_bat[BUF_SIZE_NOTCH_EXT_BAT];
 
@@ -97,22 +76,25 @@ static EXT_RAM_BSS_ATTR char buf_lock_user_selected_name[BUF_SIZE_LOCK_USER_SELE
 static EXT_RAM_BSS_ATTR char buf_lock_user_selected_data[BUF_SIZE_LOCK_USER_SELECTED_DATA];
 
 static EXT_RAM_BSS_ATTR char buf_lock_pin_message[BUF_SIZE_LOCK_PIN_MESSAGE];
-/* Add buff: static EXT_RAM_BSS_ATTR char buf_xxx[BUF_SIZE_XXX]; */
 
+static EXT_RAM_BSS_ATTR char buf_dtop_popup_tag[BUF_SIZE_DTOP_POPUP_TAG];
+static EXT_RAM_BSS_ATTR char buf_dtop_popup_message[BUF_SIZE_DTOP_POPUP_MESSAGE];
+
+static EXT_RAM_BSS_ATTR char buf_dtop_notify_user[BUF_SIZE_DTOP_NOTIFY_USER];
+
+static EXT_RAM_BSS_ATTR char buf_home_user_logged_name[BUF_SIZE_HOME_USER_LOGGED_NAME];
 /* ══════════════════════════════════════════════════════════════════
- *  Entrada de tabla
+ *                          Entrada de tabla
  * ══════════════════════════════════════════════════════════════════ */
 
 typedef struct {
-    lv_obj_t  **obj_ptr;   /**< Double pointer a objects.xxx — dirección fija en link time */
-    char       *buf;       /**< Puntero al buffer PSRAM — dirección fija en link time      */
-    uint16_t    buf_size;  /**< Tamaño en bytes del buffer (incluye null terminator)        */
+    lv_obj_t  **obj_ptr;
+    char       *buf;
+    uint16_t    buf_size;
 } label_abs_entry_t;
 
 /* ══════════════════════════════════════════════════════════════════
- *  Tabla estática — definida en compile time
- *  Los campos .buf y .obj_ptr son direcciones constantes (linkadas).
- *  El contenido de los buffers es mutable (escrito en runtime).
+ *                          Tabla estática
  * ══════════════════════════════════════════════════════════════════ */
 
 static const label_abs_entry_t s_table[UI_LABEL_ABS_COUNT] = {
@@ -208,17 +190,30 @@ static const label_abs_entry_t s_table[UI_LABEL_ABS_COUNT] = {
         .buf      = buf_lock_pin_message,
         .buf_size = BUF_SIZE_LOCK_PIN_MESSAGE, 
     },
-    /* Add buff:
-    [UI_LABEL_ABS_XXX] = {
-        .obj_ptr  = &objects.xxx,
-        .buf      = buf_xxx,
-        .buf_size = BUF_SIZE_XXX,
+    [UI_LABEL_ABS_DTOP_POPUP_TAG] = {
+        .obj_ptr  = &objects.dtop_modal_pup_tit_tag,
+        .buf      = buf_dtop_popup_tag,
+        .buf_size = BUF_SIZE_DTOP_POPUP_TAG,
     },
-    */
+    [UI_LABEL_ABS_DTOP_POPUP_MESSAGE] = {
+        .obj_ptr  = &objects.dtop_modal_pup_tit_data,
+        .buf      = buf_dtop_popup_message,
+        .buf_size = BUF_SIZE_DTOP_POPUP_MESSAGE,
+    },
+    [UI_LABEL_ABS_DTOP_NOTIFY_USER] = {
+        .obj_ptr = &objects.dtop_notifiy_message,
+        .buf = buf_dtop_notify_user,
+        .buf_size = BUF_SIZE_DTOP_NOTIFY_USER
+    },
+    [UI_LABEL_ABS_HOME_USER_LOGGED_NAME] = {
+        .obj_ptr  = &objects.ds_home_users_name,
+        .buf      = buf_home_user_logged_name,
+        .buf_size = BUF_SIZE_HOME_USER_LOGGED_NAME,
+    }
 };
 
 /* ══════════════════════════════════════════════════════════════════
- *  Implementación
+ *                              API
  * ══════════════════════════════════════════════════════════════════ */
 
 esp_err_t label_abs_prepare(ui_label_abs_id_t id,
@@ -238,7 +233,10 @@ esp_err_t label_abs_prepare(ui_label_abs_id_t id,
     }
 
     /* Copia segura al buffer PSRAM — trunca si excede buf_size */
-    strlcpy(e->buf, text, (size_t)e->buf_size);
+    size_t len = strlcpy(e->buf, text, (size_t)e->buf_size);
+    if(len >= e->buf_size) {
+        ESP_LOGW(TAG, "label id=%d: texto truncado a %d bytes", (int)id, (int)e->buf_size);
+    }
 
     *out_obj = *e->obj_ptr;
     *out_buf = (const char *)e->buf;
@@ -246,6 +244,9 @@ esp_err_t label_abs_prepare(ui_label_abs_id_t id,
     return ESP_OK;
 }
 esp_err_t ui_int__helper_label_abs_apply_sync(ui_label_abs_id_t id, const char *text) {
+    if (id >= UI_LABEL_ABS_COUNT || !text) {
+        return ESP_ERR_INVALID_ARG;
+    }
     lv_obj_t *obj = NULL;
     const char * buf = NULL;
     esp_err_t ret = label_abs_prepare(id, text, &obj, &buf);
@@ -253,4 +254,32 @@ esp_err_t ui_int__helper_label_abs_apply_sync(ui_label_abs_id_t id, const char *
 
     lv_label_set_text_static(obj, buf);
     return ret;
+}
+esp_err_t ui_int__helper_label_abs_apply_sync_fmt(ui_label_abs_id_t id, const char *fmt, ...) {
+    if (id >= UI_LABEL_ABS_COUNT || !fmt) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    const label_abs_entry_t *e = &s_table[id];
+
+    if (!(*e->obj_ptr)) {
+        ESP_LOGE(TAG, "label id=%d: obj aún no creado", (int)id);
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    va_list args;
+    va_start(args, fmt);
+    int len = vsnprintf(e->buf, (size_t)e->buf_size, fmt, args);
+    va_end(args);
+
+    if (len >= e->buf_size) {
+        ESP_LOGW(TAG, "label id=%d: texto formateado truncado a %d bytes (requería %d)", 
+                 (int)id, (int)e->buf_size, len);
+    } else if (len < 0) {
+        ESP_LOGE(TAG, "label id=%d: error al formatear el texto", (int)id);
+        return ESP_FAIL;
+    }
+
+    lv_label_set_text_static(*e->obj_ptr, e->buf);
+    return ESP_OK;
 }

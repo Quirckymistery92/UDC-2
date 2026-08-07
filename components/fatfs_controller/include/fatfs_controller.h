@@ -1,12 +1,14 @@
-/*
+/**
+ * @file fatfs_controller.h
+ * @brief Controlador de FatFS.
+ *
  * SPDX-FileCopyrightText: 2025
  * SPDX-License-Identifier: Apache-2.0
  *
  * FATFS Controller – mount / unmount / status helpers
  */
 
-#ifndef FATFS_CONTROLLER_H
-#define FATFS_CONTROLLER_H
+#pragma once
 
 #include "esp_err.h"
 #include <stddef.h>
@@ -54,5 +56,3 @@ const char* fatfs_controller_get_mount_point(void);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* FATFS_CONTROLLER_H */

@@ -1,3 +1,9 @@
+/**
+ * @file images.h
+ * @brief declaraciones de imágenes estáticas.
+ *
+ */
+
 #ifndef EEZ_LVGL_UI_IMAGES_H
 #define EEZ_LVGL_UI_IMAGES_H
 
@@ -22,7 +28,8 @@ extern const lv_img_dsc_t img_location30;
 extern const lv_img_dsc_t img_darrow_top30;
 extern const lv_img_dsc_t img_brightness30;
 extern const lv_img_dsc_t img_sound30;
-extern const lv_img_dsc_t img_information30;
+extern const lv_img_dsc_t img_dialog_warn20;
+extern const lv_img_dsc_t img_dialog_info20;
 extern const lv_img_dsc_t img_arrow_top40;
 extern const lv_img_dsc_t img_eye_normal30;
 extern const lv_img_dsc_t img_eye_detected30;
@@ -32,7 +39,6 @@ extern const lv_img_dsc_t img_arrow_restart30;
 extern const lv_img_dsc_t img_face_id40;
 extern const lv_img_dsc_t img_face_id50;
 extern const lv_img_dsc_t img_pin50;
-extern const lv_img_dsc_t img_warning30;
 extern const lv_img_dsc_t img_control_panel20;
 extern const lv_img_dsc_t img_user_logo_guest50;
 extern const lv_img_dsc_t img_user_logo_guy50;

@@ -78,5 +78,6 @@ Desktop.ini
 *.suo       # Visual Studio Solution User Options
 *.sln.docstates # Visual Studio
 build_counter.txt
+compilation_log.txt
 .antigravityignore
 GEMINI.md

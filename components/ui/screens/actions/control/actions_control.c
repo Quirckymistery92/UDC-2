@@ -9,8 +9,9 @@
  * 
  */
 
- static jpegc_element_handle_t jpegc_handle;
- static const char *TAG = "lvgl_actions";
+ static jpegc_element_handle_t jpegc_handle1;
+ static jpegc_element_handle_t jpegc_handle2;
+ static const char *TAG = "UI Internal";
 
 /***************** Callbacks for JPEGc Element *****************/
 /**
@@ -18,9 +19,9 @@
  * 
  * @note interno. No exponer a UI Manager, solo para uso dentro de screens.
  */
-static void jpegc_element_cb_pre(void)
+static void jpegc_element_cb_pre(lv_obj_t *target)
 {
-    ui_obj_set_style_bg_image_src(objects.ds_home, NULL,
+    ui_obj_set_style_bg_image_src(target, NULL,
                                  LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 static void jpegc_element_cb_post(jpegc_element_cb_post_data_t *cb_data)
@@ -48,8 +49,12 @@ esp_err_t ui_int_sys_actions_init(void)
         .timeout_ms = 500,
         .fs_letter = "/fatfs",
         .fs_default_dir = "images",
+        
     };
-    esp_err_t err = jpegc_element_handle_create(&jpegc_handle, &config);
+    esp_err_t err = jpegc_element_handle_create(&jpegc_handle1, &config);
+    ESP_RETURN_ON_FALSE(err == ESP_OK, ESP_FAIL, TAG, "Failed to create JPEGc handle: %d", err);
+
+    err = jpegc_element_handle_create(&jpegc_handle2, &config);
     ESP_RETURN_ON_FALSE(err == ESP_OK, ESP_FAIL, TAG, "Failed to create JPEGc handle: %d", err);
     return err;
 }
@@ -60,13 +65,23 @@ esp_err_t ui_int_sys_actions_init(void)
 //**********************************************************************/
 // Jpegc Element Actions. Cambiar y/o añadir background a una imagen. PUBLIC API INTERNAL.
 //**********************************************************************/
- esp_err_t ui_pub_actions_backg_update(const char *image_path, lv_obj_t *target_obj)
+esp_err_t ui_pub_actions_backg_update_DSHOME(const char *image_path)
 {
     jpegc_element_process_data_t process_data = {
         .input_path = image_path,
-        .target_obj = target_obj,
+        .target_obj = objects.ds_home,
     };
-    esp_err_t err = jpegc_element_process(jpegc_handle, &process_data);
+    esp_err_t err = jpegc_element_process(jpegc_handle1, &process_data);
+    ESP_RETURN_ON_FALSE(err == ESP_OK, ESP_FAIL, TAG, "Failed to update background image with JPEGc: %d", err);
+    return ESP_OK;
+}
+esp_err_t ui_pub_actions_backg_update_DSLOCKED(const char *image_path)
+{
+    jpegc_element_process_data_t process_data = {
+        .input_path = image_path,
+        .target_obj = objects.ds_locked,
+    };
+    esp_err_t err = jpegc_element_process(jpegc_handle2, &process_data);
     ESP_RETURN_ON_FALSE(err == ESP_OK, ESP_FAIL, TAG, "Failed to update background image with JPEGc: %d", err);
     return ESP_OK;
 }

@@ -1,3 +1,9 @@
+/**
+ * @file vars.h
+ * @brief Global UI state and variables declarations.
+ *
+ */
+
 #ifndef EEZ_LVGL_UI_VARS_H
 #define EEZ_LVGL_UI_VARS_H
 

@@ -1,4 +1,7 @@
-/*
+/**
+ * @file rtc_rx8025t_hooks.h
+ * @brief RTC hooks for system integration.
+ *
  * SPDX-FileCopyrightText: 2025
  * SPDX-License-Identifier: Apache-2.0
  *

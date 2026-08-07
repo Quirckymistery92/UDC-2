@@ -18,11 +18,14 @@
 #include "esp_cache.h"
 #include "driver/ppa.h"
 #include "sdkconfig.h"
-#include "lvgl.h"
+#include "ui.h"
 
 #include "display_lcd.h"
 #include "display_touch.h"
 
+/* ══════════════════════════════════════════════════════════════════
+ *                        Global Variables
+ * ══════════════════════════════════════════════════════════════════ */
 static const char *TAG = "lvgl_porting";
 
 #define LVGL_H_RES      LCD_H_RES
@@ -33,22 +36,25 @@ static const char *TAG = "lvgl_porting";
 
 #define LVGL_ALGINED_SIZE 128
 
-static lcd_handles_t           s_lcd_handles  = {0};
-static esp_lcd_touch_handle_t  s_touch_handle = NULL;
-static void                   *s_fb0          = NULL;
-static void                   *s_fb1          = NULL;
+static lcd_handles_t s_lcd_handles = {0};
+static esp_lcd_touch_handle_t s_touch_handle = NULL;
+static void *s_fb0 = NULL;
+static void *s_fb1 = NULL;
 
 /* Arquitectura PPA Asíncrona (Aprobada para DSI + P4) */
-static ppa_client_handle_t     s_ppa_client   = NULL;
-static SemaphoreHandle_t       s_vsync_sem    = NULL;
-static TaskHandle_t            s_sync_task    = NULL;
+static ppa_client_handle_t s_ppa_client = NULL;
+static SemaphoreHandle_t s_vsync_sem = NULL;
+static TaskHandle_t s_sync_task = NULL;
 
 /* Variables de estado para la sincronización entre frames */
-static lv_area_t               s_dirty_bbox;
-static bool                    s_first_flush  = true;
-static lv_display_t           *s_disp_to_flush= NULL;
-static void                   *s_drawn_fb     = NULL;
+static lv_area_t s_dirty_bbox;
+static bool s_first_flush = true;
+static lv_display_t *s_disp_to_flush = NULL;
+static void *s_drawn_fb = NULL;
 
+/* ══════════════════════════════════════════════════════════════════
+ *                              Helpers
+ * ══════════════════════════════════════════════════════════════════ */
 static inline void sync_cache_aligned(void *buf, uint32_t offset, uint32_t size, int flags) {
     uint32_t start_addr = (uint32_t)buf + offset;
     
@@ -58,7 +64,10 @@ static inline void sync_cache_aligned(void *buf, uint32_t offset, uint32_t size,
     esp_cache_msync((void *)aligned_start, aligned_size, flags);
 }
 
-/* Callback de interrupción DSI (Ocurre en VSYNC) */
+/* ══════════════════════════════════════════════════════════════════
+ *               Callback de interrupción DSI en VSYNC
+ * ══════════════════════════════════════════════════════════════════ */
+
 static bool on_refresh_done_cb(esp_lcd_panel_handle_t panel, esp_lcd_dpi_panel_event_data_t *edata, void *user_ctx)
 {
     BaseType_t higher_prio_woken = pdFALSE;
@@ -68,37 +77,28 @@ static bool on_refresh_done_cb(esp_lcd_panel_handle_t panel, esp_lcd_dpi_panel_e
     return higher_prio_woken == pdTRUE;
 }
 
-/* Tarea Background de altísima prioridad para sincronizar los buffers usando PPA de forma segura */
+/* ══════════════════════════════════════════════════════════════════
+ * PPA Asynchronous Bounding-Box Synchronization Task (Alta prioridad)
+ * ══════════════════════════════════════════════════════════════════ */
 static void ppa_sync_task_func(void *arg)
 {
     while (1) {
-        // 1. Esperamos a que LVGL termine de mandar el frame completo
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-        // 2. Le decimos al hardware DSI que haga flip al nuevo buffer renderizado.
-        // OJO: El hardware no cambia de inmediato, lo deja en cola para el próximo VSYNC.
         esp_lcd_panel_draw_bitmap(s_lcd_handles.panel, 0, 0, LCD_H_RES, LCD_V_RES, s_drawn_fb);
 
-        // 3. Limpiamos cualquier VSYNC viejo almacenado accidentalmente
-        xSemaphoreTake(s_vsync_sem, 0);
-
-        // 4. ESPERA CRÍTICA DE TEARING: Nos bloqueamos hasta el VSYNC real.
-        // Al pasar de aquí, confirmamos que 's_drawn_fb' está siendo escaneado de forma segura,
-        // y el 'offline_fb' (buffer viejo) ya nadie lo está usando. ¡Podemos escribir en él!
+        xSemaphoreTake(s_vsync_sem, 0); //Limpieza
         xSemaphoreTake(s_vsync_sem, portMAX_DELAY);
 
         void *offline_fb = (s_drawn_fb == s_fb0) ? s_fb1 : s_fb0;
-
-        // 5. Dimensiones exactas del Bounding Box (Ahorra un 80% de esfuerzo PPA)
         uint32_t w = s_dirty_bbox.x2 - s_dirty_bbox.x1 + 1;
         uint32_t h = s_dirty_bbox.y2 - s_dirty_bbox.y1 + 1;
         uint32_t offset = (s_dirty_bbox.y1 * LVGL_H_RES + s_dirty_bbox.x1) * BPP;
         uint32_t size = (h * LVGL_H_RES) * BPP; 
 
-        // Flush (Clean) de la caché CPU a PSRAM para que el PPA vea lo que LVGL dibujó
         sync_cache_aligned(s_drawn_fb, offset, size, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
 
-        // Configuración SRM estricta del PPA 
+        // Configuración SRM estricta del PPA
         ppa_srm_oper_config_t srm_cfg;
         memset(&srm_cfg, 0, sizeof(srm_cfg));
 
@@ -124,22 +124,19 @@ static void ppa_sync_task_func(void *arg)
         srm_cfg.scale_y = 1.0f;
         srm_cfg.mode = PPA_TRANS_MODE_BLOCKING;
 
-        // Ejecutar DMA a velocidad máxima
         ppa_do_scale_rotate_mirror(s_ppa_client, &srm_cfg);
-
-        // Invalidate de PSRAM a CPU Caché, para que el próximo frame no dibuje sobre basura visual
         sync_cache_aligned(offline_fb, offset, size, ESP_CACHE_MSYNC_FLAG_DIR_M2C);
 
-        // 6. Resetear Bounding box y soltar a LVGL para que dibuje el siguiente frame
         s_first_flush = true;
-        lv_disp_flush_ready(s_disp_to_flush);
+        lv_display_flush_ready(s_disp_to_flush);   
     }
 }
 
-/* Callback de LVGL: Extremadamente rápido, 0% bloqueante */
+/* ══════════════════════════════════════════════════════════════════
+ *               Callback LVGL para el dibujado de frames
+ * ══════════════════════════════════════════════════════════════════ */
 static void display_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
-    // Construcción del Bounding Box (Caja contenedora de todas las áreas sucias)
     if (s_first_flush) {
         s_dirty_bbox = *area;
         s_first_flush = false;
@@ -150,17 +147,19 @@ static void display_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t 
         if (area->y2 > s_dirty_bbox.y2) s_dirty_bbox.y2 = area->y2;
     }
 
-    if (lv_disp_flush_is_last(disp)) {
+    if (lv_display_flush_is_last(disp)) {
         s_disp_to_flush = disp;
         s_drawn_fb = px_map;
         // Despertar a la tarea PPA para que administre el VSYNC y la copia
         xTaskNotifyGive(s_sync_task);
     } else {
-        // Aún quedan trozos por dibujar de este frame, seguimos inmediatamente
-        lv_disp_flush_ready(disp);
+        lv_display_flush_ready(disp);
     }
 }
 
+/* ══════════════════════════════════════════════════════════════════
+ *               Callback LVGL para la lectura del touch
+ * ══════════════════════════════════════════════════════════════════ */
 static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
 {
     if (!s_touch_handle) {
@@ -184,7 +183,9 @@ void lvgl_porting_set_task_handle(TaskHandle_t task)
 {
     (void)task; 
 }
-
+/* ══════════════════════════════════════════════════════════════════
+ *              Inicialiación del display y touch para LVGL
+ * ══════════════════════════════════════════════════════════════════ */
 lv_display_t *lvgl_porting_display_init(void)
 {
     ESP_ERROR_CHECK(display_lcd_init(&s_lcd_handles));
@@ -248,7 +249,9 @@ lv_indev_t *lvgl_porting_touch_init(lv_display_t *disp)
     ESP_LOGI(TAG, "Touch initialised");
     return indev;
 }
-
+/* ══════════════════════════════════════════════════════════════════
+ *                          Backlight
+ * ══════════════════════════════════════════════════════════════════ */
 esp_err_t lvgl_porting_backlight_on(void)            { return display_lcd_backlight_on(); }
 esp_err_t lvgl_porting_backlight_off(void)           { return display_lcd_backlight_off(); }
 esp_err_t lvgl_porting_backlight_set(int pct)        { return display_lcd_brightness_set(pct); }

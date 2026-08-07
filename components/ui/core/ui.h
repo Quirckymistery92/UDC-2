@@ -1,4 +1,7 @@
-/*
+/**
+ * @file ui.h
+ * @brief Internal LVGL command, queue, and porting declarations.
+ *
  * SPDX-FileCopyrightText: 2025
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -17,6 +20,19 @@
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#define LVGL_CHECK_OBJ 0
+
+#if LVGL_CHECK_OBJ
+#define LVGL_CHECK_OBJ_PTR(obj) do { \
+    if (obj == NULL || !lv_obj_is_valid(obj)) { \
+        ESP_LOGE("LVGL", "LVGL object %p pointer is NULL!", obj); \
+        return; \
+    } \
+} while (0)
+#else
+#define LVGL_CHECK_OBJ_PTR(obj) do { } while (0)
 #endif
 
 /* ══════════════════════════════════════════════════════════════════
@@ -59,6 +75,18 @@ typedef enum {
 
     /* Specific */
     LVGL_CMD_SPC_BAT_SET_DATA,   /**< Comando específico para actualizar datos de batería en pantalla */
+    LVGL_CMD_SPC_CONTROL_PANEL_SHOW, /**< Comando específico para mostrar u ocultar el panel de control */
+    LVGL_CMD_SPC_NOTIFICATION_SHOW, /**< Comando específico para mostrar notificaciones */
+
+    /* Timer control */
+    LVGL_CMD_TIMER_CONTROL,
+    LVGL_CMD_TIMER_SET_PERIOD,
+    LVGL_CMD_TIMER_RESET,
+    LVGL_CMD_TIMER_SET_REPEAT_COUNT,
+    LVGL_CMD_TIMER_SET_AUTO_DELETE,
+    LVGL_CMD_TIMER_SET_USER_DATA,
+
+
 
     LVGL_CMD_MAX
 } lvgl_cmd_t;
@@ -151,6 +179,27 @@ typedef union {
         int voltage_mv;
         bool is_charging;
     }spc_bat_set_data;
+
+    struct {
+        bool show;
+    } spc_control_panel_show;
+
+    struct {
+        lv_timer_t *timer;
+        union {
+            bool apply_pause;
+            uint32_t period;
+            int32_t repeat_count;
+            bool auto_delete;
+            void * user_data;
+        }extra;
+    } timer_resume;
+
+    struct {
+        char msg[256];
+        bool is_alert;
+    }spc_notification_show;
+    
 } lvgl_cmd_data_t;
 
 /* ══════════════════════════════════════════════════════════════════

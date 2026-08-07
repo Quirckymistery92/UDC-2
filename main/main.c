@@ -1,11 +1,10 @@
 /*
- * SPDX-FileCopyrightText: 2025
+ * SPDX-FileCopyrightText: 2026 Alex Jaque
  * SPDX-License-Identifier: Apache-2.0
  *
  * UDC-2 Main Application
  * ESP32-P4 + JD9365 DSI Display + GSL3680 Touch + LVGL 9
  *
- * Uses ui_manager.h for all UI interaction (task-safe command queue)
  */
 
 #include <stdio.h>
@@ -20,6 +19,7 @@
 #include "battery_actions.h"
 #include "NVSm_sys.h"
 #include "sys_module.h"
+#include "version_info.h"
 
 static const char *TAG = "main";
 
@@ -72,10 +72,17 @@ void app_main(void)
     ESP_LOGI(TAG, "Initializing battery actions...");
     ESP_ERROR_CHECK(battery_actions_init());
 
-    ESP_LOGI(TAG, "UDC-2 initialized successfully");
+    ESP_LOGI(TAG, "UDC-2 initialized successfully on Build");
+    ESP_LOGI(TAG, "Número de Build : %d", BUILD_COUNTER);
+    ESP_LOGI(TAG, "Fecha / Hora    : %s", BUILD_DATETIME);
+    ESP_LOGI(TAG, "Rama Git        : %s", BUILD_GIT_BRANCH);
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "Commit Git      : %s", BUILD_GIT_COMMIT);
+    ESP_LOGI(TAG, "========================================");
 
     /* Keep app main alive */
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(10000));
+
     }
 }

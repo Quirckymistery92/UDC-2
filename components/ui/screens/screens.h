@@ -1,3 +1,9 @@
+/**
+ * @file screens.h
+ * @brief Objetos y pantallas de la UI.
+ *
+ */
+
 #pragma once
 #include <lvgl.h>
 
@@ -5,8 +11,11 @@
 extern "C" {
 #endif
 
-// Screens
-
+/**
+ * @brief Enumeración de pantallas disponibles en el sistema.
+ *
+ * Los valores representan las pantallas principales que puede mostrar la UI.
+ */
 typedef enum {
     SCREEN_ID_DS_TOP = 0,
     SCREEN_ID_DS_LOCKED = 1,
@@ -14,6 +23,13 @@ typedef enum {
     SCREEN_ID_DS_CONFIG = 3,
 } ScreensEnum;
 
+/**
+ * @brief Contenedor global de objetos LVGL usados por las pantallas.
+ *
+ * Esta estructura agrupa los punteros `lv_obj_t*` para los widgets y
+ * contenedores que forman cada screen. Se utiliza para acceder de forma
+ * centralizada a los objetos creados en el módulo de pantallas.
+ */
 typedef struct _objects_t {
     lv_obj_t *ds_top;
     lv_obj_t *ds_locked;
@@ -61,6 +77,7 @@ typedef struct _objects_t {
     lv_obj_t *dtop_modal_pup_tit_img1;
     lv_obj_t *dtop_modal_pup_tit_title;
     lv_obj_t *dtop_modal_pup_tit_img2;
+    lv_obj_t *dtop_modal_pup_tit_tag;
     lv_obj_t *dtop_modal_pup_tit_data;
     lv_obj_t *dtop_modal_pup_tit_btn_cont;
     lv_obj_t *dtop_modal_pup_tit_btn_cancel;
@@ -213,11 +230,41 @@ typedef struct _objects_t {
     lv_obj_t *ds_home_nav_btn_extra_lbl;
 } objects_t;
 
+/**
+ * @brief Instancia global de los objetos LVGL de la UI.
+ *
+ * Las pantallas y widgets del sistema se referencian a través de esta
+ * variable desde otros módulos de UI.
+ */
 extern objects_t objects;
 
-void create_screens();
+/**
+ * @brief Crea todas las screens declaradas en `ScreensEnum`.
+ *
+ * Esta función construye los objetos LVGL y los asigna a la variable
+ * global `objects`. Debe llamarse durante la inicialización de la UI.
+ */
+void create_screens(void);
+
+/**
+ * @brief Comprueba si la pantalla HOME ya fue creada.
+ *
+ * @return true si `ds_home` y sus widgets están inicializados.
+ */
 bool ui_int__is_screen_created_ds_home(void);
+
+/**
+ * @brief Comprueba si la pantalla TOP ya fue creada.
+ *
+ * @return true si `ds_top` y sus widgets están inicializados.
+ */
 bool ui_int__is_screen_created_ds_top(void);
+
+/**
+ * @brief Comprueba si la pantalla LOCKED ya fue creada.
+ *
+ * @return true si `ds_locked` y sus widgets están inicializados.
+ */
 bool ui_int__is_screen_created_ds_locked(void);
 
 #ifdef __cplusplus

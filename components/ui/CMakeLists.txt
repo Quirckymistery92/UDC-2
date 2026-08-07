@@ -7,6 +7,7 @@ set(UI_SRCS_CORE
 
 set(UI_SRCS_FONTS
     "fonts/ui_font_anton80.c"
+    "fonts/ui_font_anton22.c"
     "fonts/ui_font_mulish12.c"
     "fonts/ui_font_mulish14.c"
     "fonts/ui_font_mulish16.c"
@@ -37,14 +38,14 @@ set(UI_SRCS_IMAGES
     "images/ui_image_eye_off30.c"
     "images/ui_image_face_id40.c"
     "images/ui_image_face_id50.c"
-    "images/ui_image_information30.c"
+    "images/ui_image_dialog_info20.c"
     "images/ui_image_iot_active30.c"
     "images/ui_image_location30.c"
     "images/ui_image_menudot_v30.c"
     "images/ui_image_pin50.c"
     "images/ui_image_sia.c"
     "images/ui_image_sound30.c"
-    "images/ui_image_warning30.c"
+    "images/ui_image_dialog_warn20.c"
     "images/ui_image_wifi_off30.c"
     "images/ui_image_wifi_on30.c"
     "images/ui_image_user_logo_default50.c"
@@ -73,7 +74,6 @@ set(UI_SRCS_IMAGES
 )
 
 set(UI_SRCS_PRIVATE
-    "private/lv_mem_port.c"
     "private/porting/porting.c"
 )
 
@@ -127,15 +127,7 @@ idf_component_register(
         "sys_modules"
 )
 
-# Force the linker to pull lv_mem_port.c.obj from libui.a before processing liblvgl__lvgl.a.
-# Without this, lv_malloc_core/lv_free_core/lv_realloc_core/lv_mem_init stay unresolved because
-# all occurrences of libui.a appear before the second pass of liblvgl__lvgl.a in the link order.
-target_link_libraries(${COMPONENT_LIB} INTERFACE
-    "-Wl,-u,lv_malloc_core"
-    "-Wl,-u,lv_free_core"
-    "-Wl,-u,lv_realloc_core"
-    "-Wl,-u,lv_mem_init"
-)
+
 
 
 

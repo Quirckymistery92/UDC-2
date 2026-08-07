@@ -4,9 +4,6 @@ cmake_minimum_required(VERSION 3.16)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
-# Script de contador de compilaciones
-include(${CMAKE_SOURCE_DIR}/build_counter.cmake)
-
 # Suppress noisy warnings from LVGL and dependencies
 add_compile_options(-Wno-format)
 add_compile_options(-Wno-ignored-qualifiers)
@@ -17,3 +14,20 @@ project(UDC-2)
 
 # La función correcta para imágenes compatibles con Wear Leveling:
 fatfs_create_spiflash_image(storage ${CMAKE_SOURCE_DIR}/fatfs_data FLASH_IN_PROJECT)
+
+set(GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/include")
+file(MAKE_DIRECTORY ${GENERATED_INCLUDE_DIR})
+
+add_custom_target(update_version_info ALL
+    COMMAND ${CMAKE_COMMAND} -E echo "Actualizando datos de compilación..."
+    COMMAND python "${CMAKE_SOURCE_DIR}/generate_build_info.py" "${CMAKE_BINARY_DIR}" "${CMAKE_SOURCE_DIR}"
+    BYPRODUCTS "${GENERATED_INCLUDE_DIR}/version_info.h"
+    VERBATIM
+)
+
+idf_build_set_property(COMPILE_OPTIONS "-I${GENERATED_INCLUDE_DIR}" APPEND)
+
+add_dependencies(__idf_main update_version_info)
+
+string(TIMESTAMP BUILD_DATETIME "%H%M%S")
+target_compile_options(__idf_main PRIVATE "-D__BUILD_NONCE__=${BUILD_DATETIME}")
