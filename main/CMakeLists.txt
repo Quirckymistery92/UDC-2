@@ -3,9 +3,15 @@ idf_component_register(
         "main.c"
         "drivers/display_lcd.c"
         "drivers/display_touch.c"
+        "boot/app_init_normal.c"
+        "boot/app_launcher.c"
+        "modules/user_manager/user_manager.c"
     INCLUDE_DIRS
-        "."
         "drivers"
+    PRIV_INCLUDE_DIRS
+        "boot"
+        "modules"
+        "modules/user_manager"
     PRIV_REQUIRES
         driver
         esp_lcd
@@ -15,7 +21,7 @@ idf_component_register(
         fatfs_controller
         jpegc_element
         i2c_controller
-        rtc_rx8025t
+        rtc_time
         battery_guard
         NVSm_sys
         sys_modules

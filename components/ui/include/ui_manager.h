@@ -15,7 +15,7 @@
 
 #include "esp_err.h"
 #include "lvgl.h"
-#include "screens.h"     /* ScreensEnum, objects_t, extern objects */
+#include "objects.h"     /* ScreensEnum, objects_t, extern objects */
 #include "ui_image_sia.h" /* ui_icon_id_t — enum SIA de íconos estáticos asignados */
 
 #ifdef __cplusplus
@@ -46,9 +46,8 @@ esp_err_t ui_init(void);
  * @brief Señala al subsistema UI que la pantalla indicada está lista
  *        para continuar con el flujo sincronizado de inicialización.
  *
- * @param screen_id Identificador de pantalla del enum ScreensEnum.
  */
-void ui__helper_sync_sys_screens_semaphore(ScreensEnum screen_id);
+void ui__helper_sync_sys_screens_get_semaphore(void);
 
 /* ══════════════════════════════════════════════════════════════════
  *  Screen Management
@@ -69,7 +68,9 @@ esp_err_t ui_screen_change(ScreensEnum screen_id,
                            uint32_t time,
                            uint32_t delay,
                            bool auto_del);
-                           
+
+esp_err_t ui_screen_loader(ScreensEnum screens_ids, ScreensEnum one_screen_load);       
+                    
 /**
  * @brief Cambiar imagen del fondo de pantalla de Home (Método Asíncrono)
  *
@@ -91,7 +92,12 @@ esp_err_t ui_async_screen_backg_update_DSHOME(ui_backg_img_t img, lv_obj_t *obj)
  * registrar la entry correspondiente en core/ui_label_abs.c.
  */
 typedef enum {
-    UI_LABEL_ABS_NOTCH_HOUR = 0,  /**< Notch — hora "HH:MM" / "HH:MM:SS" (buf: 12 bytes) */
+    UI_LABEL_NONE = 0,
+    UI_LABEL_ABS_NOTCH_HOUR,
+    UI_LABEL_ABS_NOTCH_EXP_dHOUR, // dHour significa Hora detallada que incluye segundos.
+    UI_LABEL_ABS_LOCKED_SCR_HOUR,
+    UI_LABEL_ABS_LOCKED_SRC_DATE, // Date significa la fecha actual. Formato: DD de MM del YYYY
+    UI_LABEL_ABS_HOME_SRC_DATE,
     UI_LABEL_ABS_LOCKED_USER_SELECTED_NAME,
     UI_LABEL_ABS_LOCKED_USER_SELECTED_DATA,
     UI_LABEL_ABS_NOTCH_EXT_BAT,
@@ -115,6 +121,7 @@ typedef enum {
     UI_LABEL_ABS_DTOP_POPUP_MESSAGE,
     UI_LABEL_ABS_DTOP_NOTIFY_USER,
     UI_LABEL_ABS_HOME_USER_LOGGED_NAME,
+    UI_LABEL_ABS_LOADER_DATA,
     UI_LABEL_ABS_COUNT
 } ui_label_abs_id_t;
 
@@ -446,7 +453,7 @@ esp_err_t ui_backlight_off(void);
  * @param brightness_percent Porcentaje de brillo (0-100).
  * @return ESP_OK si la operación tuvo éxito.
  */
-esp_err_t ui_backlight_set(int brightness_percent);
+esp_err_t ui_backlight_set(uint8_t brightness_percent);
 
 #ifdef __cplusplus
 }

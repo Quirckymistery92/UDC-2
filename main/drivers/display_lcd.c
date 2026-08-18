@@ -294,16 +294,16 @@ esp_err_t display_lcd_brightness_init(void)
         .timer_sel  = LEDC_TIMER_1,
         .duty       = 0,
         .hpoint     = 0,
+        .flags.output_invert = 0
     };
     ESP_RETURN_ON_ERROR(ledc_channel_config(&bl_channel), TAG, "LEDC channel config failed");
 
     return ESP_OK;
 }
 
-esp_err_t display_lcd_brightness_set(int brightness_percent)
+esp_err_t display_lcd_brightness_set(uint8_t brightness_percent)
 {
     if (brightness_percent > 100) brightness_percent = 100;
-    if (brightness_percent < 0)   brightness_percent = 0;
 
     ESP_LOGI(TAG, "Setting LCD backlight: %d%%", brightness_percent);
     uint32_t duty = (1023 * brightness_percent) / 100;

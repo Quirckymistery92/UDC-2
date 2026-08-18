@@ -21,7 +21,7 @@ file(MAKE_DIRECTORY ${GENERATED_INCLUDE_DIR})
 add_custom_target(update_version_info ALL
     COMMAND ${CMAKE_COMMAND} -E echo "Actualizando datos de compilación..."
     COMMAND python "${CMAKE_SOURCE_DIR}/generate_build_info.py" "${CMAKE_BINARY_DIR}" "${CMAKE_SOURCE_DIR}"
-    BYPRODUCTS "${GENERATED_INCLUDE_DIR}/version_info.h"
+    BYPRODUCTS "${GENERATED_INCLUDE_DIR}/version_info.h" "${GENERATED_INCLUDE_DIR}/build_timestamp.h"
     VERBATIM
 )
 

@@ -59,7 +59,7 @@ esp_err_t display_lcd_brightness_init(void);
 /**
  * @brief Set display brightness (0-100%)
  */
-esp_err_t display_lcd_brightness_set(int brightness_percent);
+esp_err_t display_lcd_brightness_set(uint8_t brightness_percent);
 
 /**
  * @brief Turn backlight ON (100%)

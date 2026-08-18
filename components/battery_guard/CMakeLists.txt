@@ -1,15 +1,14 @@
 idf_component_register(
     SRCS
-        "battery_actions.c"
-        "battery_guard/battery_guard.c"
-        "nvs_sv_batgd.c"
+        "src/battery_guard.c"
+        "NVSMod/nvs_sv_batgd.c"
     INCLUDE_DIRS
         "include"
     PRIV_INCLUDE_DIRS
-        "battery_guard"
+        "NVSMod"
     REQUIRES
         "nvs_flash"
         "esp_adc"
         "esp_hw_support"
         "ui"
-)
+) 

@@ -1,0 +1,15 @@
+idf_component_register(
+    SRCS
+        "src/rtc_rx8025t.c"
+        "NVSmod/NVSm_udc_time.c"
+        "src/udc_time.c"
+    INCLUDE_DIRS
+        "include"
+    PRIV_INCLUDE_DIRS
+        "NVSmod"
+    REQUIRES
+        "i2c_controller"
+        "esp_timer"
+        "driver"
+        "NVSm_sys"
+)

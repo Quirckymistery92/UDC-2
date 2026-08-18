@@ -6,8 +6,6 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 
-#include "user_manager_nvs.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -26,21 +24,7 @@ esp_err_t NVSm_sys_init(void);
  */
 esp_err_t NVSm_sys_deinit(void);
 
-/**
- * @brief Helpers de concurrencia expuestos para los submódulos
- */
-esp_err_t NVSm_sys_lock(void);
-void NVSm_sys_unlock(void);
-
-
-// ==========================================
-// INCLUDES DE SUBMÓDULOS (Plug & Play)
-// ==========================================
-// Si un módulo ya no se usa, simplemente comentas o eliminas su include aquí
-// y lo retiras de la carpeta modules/
-
-// ...
-
+bool NVSm_sys_is_initialized(void);
 #ifdef __cplusplus
 }
 #endif
