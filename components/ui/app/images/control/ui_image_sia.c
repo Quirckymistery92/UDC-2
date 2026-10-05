@@ -14,6 +14,15 @@
 #include "ui_manager.h"
 #include "images.h"
 
+static const char *const sia_images[UI_IMAGE_COUNT] = {
+    [UI_IMAGE_THUNDER_RAIL] = "bg_thunder_rail.jpg",
+    [UI_IMAGE_BOSTON_LIGHTS] = "bg_boston_lights.jpg",
+    [UI_IMAGE_FOREST_COMMON] = "bg_forest_common.jpg",
+    [UI_IMAGE_LAST_NIGHT] = "bg_last_night.jpg",
+    [UI_IMAGE_NEW_YORK_TIME] = "bg_new_york_time.jpg",
+    [UI_IMAGE_BLUE_CARAMEL] = "bg_blue_caramel.jpg",
+    [UI_IMAGE_VOLKAN_CLUSTER] = "bg_volkan_cluster.jpg",
+};
 /* ══════════════════════════════════════════════════════════════════
  *  Tabla SIA — compile-time, reside en flash
  *
@@ -26,13 +35,8 @@ static const lv_img_dsc_t *const sia_icons[UI_ICON_COUNT] = {
     [UI_ICON_BAT_LOW] = &img_bat_low30,
     [UI_ICON_BAT_MED] = &img_bat_med30,
     [UI_ICON_BAT_MAX] = &img_bat_max30,
-    [UI_ICON_IOT_ACTIVE] = &img_iot_active30,
     [UI_ICON_WIFI_ON] = &img_wifi_on30,
     [UI_ICON_WIFI_OFF] = &img_wifi_off30,
-    [UI_ICON_IOT_FACE_ID] = &img_face_id40,
-    [UI_ICON_MENUDOT_V] = &img_menudot_v30,
-    [UI_ICON_INFORMATION30] = &img_dialog_info20,
-    [UI_ICON_WARNING30] = &img_dialog_warn20,
 
     [UI_ICON_USER_LOGO_DEFAULT] = &img_user_logo_default50,
     [UI_ICON_USER_LOGO_BABY] = &img_user_logo_baby50,
@@ -58,31 +62,37 @@ static const lv_img_dsc_t *const sia_icons[UI_ICON_COUNT] = {
     [UI_ICON_USER_LOGO_VERY_HAPPY] = &img_user_logo_very_happy50,
     [UI_ICON_USER_LOGO_WORRIED] = &img_user_logo_worried50,
 
-
+    [UI_ICON_ZB_LIGHT_ON] = &img_light_bulb_on90,
+    [UI_ICON_ZB_LIGHT_OFF] = &img_light_bulb_off90,
+    [UI_ICON_ZB_LIGHT_ERROR] = &img_light_bulb_error90,
+    [UI_ICON_ZB_LIGHT_AMBIENT] = &img_ambient_light90,
+    [UI_ICON_ZB_TEMPERATURE] = &img_temperature90,
+    [UI_ICON_ZB_SWITCH_ON] = &img_switch_on90,
+    [UI_ICON_ZB_SWITCH_OFF] = &img_switch_off90,
+    [UI_ICON_ZB_SWITCH_ERROR] = &img_switch_error90
 };
 
 /* Verificación en compile-time: la tabla cubre todos los IDs */
 _Static_assert(
     sizeof(sia_icons) / sizeof(sia_icons[0]) == UI_ICON_COUNT,
-    "sia_icons[]: faltan entradas — sincronizar con ui_icon_id_e"
+    "sia_icons: faltan entradas — sincronizar con ui_icon_id_e"
 );
 
 /* ══════════════════════════════════════════════════════════════════
  *  API
  * ══════════════════════════════════════════════════════════════════ */
- const lv_img_dsc_t *images_ctl_internal_get_src(ui_icon_id_t icon_id)
+ const lv_img_dsc_t *ui_int__sia_icons_get_src_by_id(ui_icon_id_t icon_id)
 {
     if (icon_id >= UI_ICON_COUNT) {
         return NULL;
     }
     return sia_icons[icon_id];
 }
-/*
-esp_err_t ui_image_set_src_sia(lv_obj_t *obj, ui_icon_id_t icon_id)
+
+const char *ui_int__sia_images_get_path_by_id(ui_images_id_t image_id)
 {
-    if (!obj || icon_id >= UI_ICON_COUNT) {
-        return ESP_ERR_INVALID_ARG;
+    if (image_id >= UI_IMAGE_COUNT || image_id == UI_IMAGE_NONE) {
+        return NULL;
     }
-    return ui_image_set_src(obj, sia_icons[icon_id]);
+    return sia_images[image_id];
 }
-*/

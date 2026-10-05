@@ -14,12 +14,15 @@ set(UI_SRCS_FONTS
     "app/fonts/src/ui_font_mulish18.c"
     "app/fonts/src/ui_font_mulish20.c"
     "app/fonts/src/ui_font_mulish30.c"
+    "app/fonts/src/ui_font_mulish40.c"
+    "app/fonts/src/ui_font_mulish_bold12.c"
     "app/fonts/src/ui_font_mulish_bold14.c"
     "app/fonts/src/ui_font_mulish_bold16.c"
     "app/fonts/src/ui_font_mulish_bold18.c"
     "app/fonts/src/ui_font_mulish_bold20.c"
     "app/fonts/src/ui_font_mulish_bold24.c"
     "app/fonts/src/ui_font_mulish_bold26.c"
+    "app/fonts/src/ui_font_outfit26.c"
 )
 
 set(UI_SRCS_IMAGES
@@ -42,9 +45,7 @@ set(UI_SRCS_IMAGES
     "app/images/src/ui_image_face_id40.c"
     "app/images/src/ui_image_face_id50.c"
     "app/images/src/ui_image_dialog_info20.c"
-    "app/images/src/ui_image_iot_active30.c"
     "app/images/src/ui_image_location30.c"
-    "app/images/src/ui_image_menudot_v30.c"
     "app/images/src/ui_image_pin50.c"
     "app/images/src/ui_image_sound30.c"
     "app/images/src/ui_image_dialog_warn20.c"
@@ -77,6 +78,32 @@ set(UI_SRCS_IMAGES
     "app/images/src/ui_image_firmware_logo.c"
     "app/images/src/ui_image_information_only230x280.c"
     "app/images/src/ui_image_support_assistant120.c"
+    "app/images/src/ui_image_ambient_light90.c"
+    "app/images/src/ui_image_hardware_chip30.c"
+    "app/images/src/ui_image_hardware_ram_ext30.c"
+    "app/images/src/ui_image_hardware_ram30.c"
+    "app/images/src/ui_image_light_bulb_error90.c"
+    "app/images/src/ui_image_light_bulb_off90.c"
+    "app/images/src/ui_image_light_bulb_on90.c"
+    "app/images/src/ui_image_switch_off90.c"
+    "app/images/src/ui_image_switch_error90.c"
+    "app/images/src/ui_image_scenes_autom80.c"
+    "app/images/src/ui_image_settings80.c"
+    "app/images/src/ui_image_switch_on90.c"
+    "app/images/src/ui_image_temperature90.c"
+    "app/images/src/ui_image_wt_humidity15.c"
+    "app/images/src/ui_image_wt_pcloudy_day70.c"
+    "app/images/src/ui_image_wt_rain30.c"
+    "app/images/src/ui_image_wt_winds15.c"
+    "app/images/src/ui_image_zigbee_icon75.c"
+    "app/images/src/ui_image_zigbee_icon30.c"
+    "app/images/src/ui_image_action_lock60.c"
+    "app/images/src/ui_image_action_logout60.c"
+    "app/images/src/ui_image_action_poweroff60.c"
+    "app/images/src/ui_image_action_restart60.c"
+    "app/images/src/ui_image_dimmer_light40.c"
+    "app/images/src/ui_image_goto_output20.c"
+    "app/images/src/ui_image_palet_edit40.c"
 )
 
 set(UI_SRCS_PRIVATE
@@ -85,6 +112,7 @@ set(UI_SRCS_PRIVATE
 
 set(UI_SRCS_SCREENS
     "app/interface/objects.c"
+    "app/interface/zigbee_hall/ui_zb_controller.c"
 
     "app/interface/screens/modules/actions_control.c"
     "app/interface/screens/modules/clock_control.c"
@@ -124,6 +152,7 @@ idf_component_register(
         "app/fonts/include"
         "app/images/include"
         "app/interface/include"
+        "app/interface/zigbee_hall/include"
     REQUIRES
         "lvgl"
     PRIV_REQUIRES
@@ -135,9 +164,10 @@ idf_component_register(
         "esp_hw_support"
         "esp_timer"
         "esp_driver_ppa"
+        "udc_metrics"
         "jpegc_element"
         "esp_mm"
-        "sys_modules"
+        "user_management"
         "rtc_time"
         "esp_driver_gpio"
         "i2c_controller"

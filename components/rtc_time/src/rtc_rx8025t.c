@@ -4,58 +4,67 @@
  */
 
 #include "rtc_rx8025t.h"
-#include "i2c_controller.h"
 
+/* ESP */
 #include <string.h>
 #include <sys/time.h>
-
 #include "esp_log.h"
 #include "esp_check.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 
-static const char *TAG = "RTC";
+/* Módulos  & helpers */
+#include "i2c_controller.h"
 
-#define RTC_I2C_ADDR        (0x32)
-#define RTC_I2C_CLK_HZ      (400000)
-#define RTC_I2C_TIMEOUT_MS  (50)
+/* Variables */
+    static const char * const TAG = "RTC";
 
-#define REG_SECONDS         (0x00)
-#define REG_MINUTES         (0x01)
-#define REG_HOURS           (0x02)
-#define REG_WEEKDAY         (0x03)
-#define REG_DATE            (0x04)
-#define REG_MONTH           (0x05)
-#define REG_YEAR            (0x06)
-#define REG_EXT             (0x0D)
+    #define RTC_I2C_ADDR        (0x32)
+    #define RTC_I2C_CLK_HZ      (400000)
+    #define RTC_I2C_TIMEOUT_MS  (50)
 
-#define REG_CTRL1           (0x0E) 
-#define REG_CTRL2           (0x0F) 
+    #define REG_SECONDS         (0x00)
+    #define REG_MINUTES         (0x01)
+    #define REG_HOURS           (0x02)
+    #define REG_WEEKDAY         (0x03)
+    #define REG_DATE            (0x04)
+    #define REG_MONTH           (0x05)
+    #define REG_YEAR            (0x06)
+    #define REG_EXT             (0x0D)
 
-#define BIT_VDET            (1 << 0) 
-#define BIT_VLF             (1 << 1) 
-#define BIT_XSTP            (1 << 5) 
-#define CTRL_TEMP_COMP_2S   (0x40)   
+    #define REG_CTRL1           (0x0E) 
+    #define REG_CTRL2           (0x0F) 
 
-#define SYNC_CMD_EXIT       (1 << 0)
-#define SYNC_CMD_FORCE      (1 << 1)
+    #define BIT_VDET            (1 << 0) 
+    #define BIT_VLF             (1 << 1) 
+    #define BIT_XSTP            (1 << 5) 
+    #define CTRL_TEMP_COMP_2S   (0x40)   
 
-static i2c_master_dev_handle_t s_dev         = NULL;
-static SemaphoreHandle_t       s_mutex       = NULL;
-static TaskHandle_t            s_task_handle = NULL;
-static rtc_rx8025t_cb_t        s_user_cb     = NULL;
+    #define SYNC_CMD_EXIT       (1 << 0)
+    #define SYNC_CMD_FORCE      (1 << 1)
 
-static inline uint8_t bcd2dec(uint8_t b) { return (b >> 4) * 10 + (b & 0x0F); }
-static inline uint8_t dec2bcd(uint8_t d) { return ((d / 10) << 4) | (d % 10); }
+    static i2c_master_dev_handle_t s_dev         = NULL;
+    static SemaphoreHandle_t       s_mutex       = NULL;
+    static TaskHandle_t            s_task_handle = NULL;
+    static rtc_rx8025t_cb_t        s_user_cb     = NULL;
 
-static inline uint8_t tm_wday_to_rtc(int wday) { return (uint8_t)(1 << wday); }
-static inline int rtc_wday_to_tm(uint8_t b) {
-    for (int i = 0; i < 7; i++) {
-        if (b & (1 << i)) return i;
+    static inline uint8_t bcd2dec(uint8_t b) { return (b >> 4) * 10 + (b & 0x0F); }
+    static inline uint8_t dec2bcd(uint8_t d) { return ((d / 10) << 4) | (d % 10); }
+
+    static inline uint8_t tm_wday_to_rtc(int wday) { return (uint8_t)(1 << wday); }
+    static inline int rtc_wday_to_tm(uint8_t b) {
+        for (int i = 0; i < 7; i++) {
+            if (b & (1 << i)) return i;
+        }
+        return 0;
     }
-    return 0;
-}
+    static app_desc_status_t apd = {
+        .app_desc = DSC_APP_RTC_EXTERNAL,
+        .app_name = "RTC externo",
+        .app_tag = TAG,
+        .init_result = ESP_OK
+    };
 
 static esp_err_t reg_read(uint8_t addr, uint8_t *out, size_t len) {
     return i2c_master_transmit_receive(s_dev, &addr, 1, out, len, RTC_I2C_TIMEOUT_MS);
@@ -121,16 +130,16 @@ static void rtc_sync_task(void *arg) {
     vTaskDelete(NULL);
 }
 
-esp_err_t rtc_rx8025t_init(uint32_t sync_interval_sec, rtc_rx8025t_cb_t cb) {
+app_desc_status_t *rtc_rx8025t_init(uint32_t sync_interval_sec, rtc_rx8025t_cb_t cb) {
     if (s_mutex == NULL) {
         s_mutex = xSemaphoreCreateMutex();
-        ESP_RETURN_ON_FALSE(s_mutex, ESP_ERR_NO_MEM, TAG, "No se pudo crear Mutex");
+        DSC_RETURN_STRUCT_ON_FALSE(s_mutex != NULL, &apd, ESP_ERR_NO_MEM);
     }
 
-    s_user_cb = cb;
+    esp_err_t ret = i2c_controller_add_device(RTC_I2C_ADDR, RTC_I2C_CLK_HZ, &s_dev);
+    DSC_RETURN_STRUCT_ON_FALSE(ret == ESP_OK, &apd, ret);
 
-    ESP_RETURN_ON_ERROR(i2c_controller_add_device(RTC_I2C_ADDR, RTC_I2C_CLK_HZ, &s_dev),
-                        TAG, "Error registrando dispositivo I2C");
+    s_user_cb = cb;
 
     xSemaphoreTake(s_mutex, portMAX_DELAY);
     
@@ -158,8 +167,7 @@ esp_err_t rtc_rx8025t_init(uint32_t sync_interval_sec, rtc_rx8025t_cb_t cb) {
         xTaskCreate(rtc_sync_task, "rtc_sync", 3072, (void *)sync_interval_sec, 5, &s_task_handle);
     }
 
-    ESP_LOGI(TAG, "Driver RX8025T inicializado correctamente con mapeo fijo.");
-    return ESP_OK;
+    return DESC_AP_INSERT(&apd, ret);
 }
 
 esp_err_t rtc_rx8025t_force_sync(void) {

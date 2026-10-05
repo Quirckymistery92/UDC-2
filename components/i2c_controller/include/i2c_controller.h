@@ -9,8 +9,12 @@
 
 #pragma once
 
+/* ESP */
 #include "esp_err.h"
 #include "driver/i2c_master.h"
+
+/* Módulos */
+#include "desc_apps.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,7 +35,7 @@ extern "C" {
  * @return @c ESP_OK si el bus quedó disponible o ya estaba inicializado.
  * @return Código de error de ESP-IDF si no se pudo crear el bus.
  */
-esp_err_t i2c_controller_init(void);
+app_desc_status_t *i2c_controller_init(void);
 
 /**
  * @brief Obtiene el handle del bus I2C compartido.

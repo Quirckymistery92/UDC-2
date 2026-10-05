@@ -13,20 +13,21 @@
 
 #pragma once
 
+/* ESP */
 #include "esp_err.h"
+
+/* Módulos */
 #include "lvgl.h"
 #include "objects.h"     /* ScreensEnum, objects_t, extern objects */
 #include "ui_image_sia.h" /* ui_icon_id_t — enum SIA de íconos estáticos asignados */
+#include "ui_label.h" /* ui_label_abs enum para label ABS */
+#include "desc_apps.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #define UI_CMD_TIMEOUT_MS  (1000)
-
-typedef enum {
-    UI_IMG_THUNDER_RAIL,
-} ui_backg_img_t;
 
 /* ══════════════════════════════════════════════════════════════════
  *  Initialization & Control
@@ -38,9 +39,8 @@ typedef enum {
  * Internally calls lvgl_init() (task, queue, mutex, tick timer)
  * then waits for the task to be ready and turns on the backlight.
  *
- * @return ESP_OK on success
  */
-esp_err_t ui_init(void);
+app_desc_status_t *ui_init(void);
 
 /**
  * @brief Señala al subsistema UI que la pantalla indicada está lista
@@ -69,61 +69,7 @@ esp_err_t ui_screen_change(ScreensEnum screen_id,
                            uint32_t delay,
                            bool auto_del);
 
-esp_err_t ui_screen_loader(ScreensEnum screens_ids, ScreensEnum one_screen_load);       
-                    
-/**
- * @brief Cambiar imagen del fondo de pantalla de Home (Método Asíncrono)
- *
- * @param img ID de imagen de fondo
- * @param obj Objeto LVGL destino que recibirá la nueva imagen
- * @return ESP_OK si el comando fue encolado correctamente
- */
-esp_err_t ui_async_screen_backg_update_DSHOME(ui_backg_img_t img, lv_obj_t *obj);
-
-/* ══════════════════════════════════════════════════════════════════
- *  Label — ABS (Assigned Buffer Static)
- * ══════════════════════════════════════════════════════════════════ */
-
-/**
- * @brief IDs de labels con buffer estático en PSRAM.
- *
- * Cada entry corresponde a un lv_obj_t* (label) y un buffer fijo
- * en PSRAM asignado en compile time. Agregar nuevos IDs aquí y
- * registrar la entry correspondiente en core/ui_label_abs.c.
- */
-typedef enum {
-    UI_LABEL_NONE = 0,
-    UI_LABEL_ABS_NOTCH_HOUR,
-    UI_LABEL_ABS_NOTCH_EXP_dHOUR, // dHour significa Hora detallada que incluye segundos.
-    UI_LABEL_ABS_LOCKED_SCR_HOUR,
-    UI_LABEL_ABS_LOCKED_SRC_DATE, // Date significa la fecha actual. Formato: DD de MM del YYYY
-    UI_LABEL_ABS_HOME_SRC_DATE,
-    UI_LABEL_ABS_LOCKED_USER_SELECTED_NAME,
-    UI_LABEL_ABS_LOCKED_USER_SELECTED_DATA,
-    UI_LABEL_ABS_NOTCH_EXT_BAT,
-    UI_LABEL_ABS_NOTCH_EXT_WIFI,
-    UI_LABEL_ABS_NOTCH_EXT_ZIGBEE,
-    UI_LABEL_ABS_NOTCH_EXT_UBICATION,
-    UI_LABEL_ABS_LOCKED_USERS_1_NAME,
-    UI_LABEL_ABS_LOCKED_USERS_1_DATA,
-    UI_LABEL_ABS_LOCKED_USERS_2_NAME,
-    UI_LABEL_ABS_LOCKED_USERS_2_DATA,
-    UI_LABEL_ABS_LOCKED_USERS_3_NAME,
-    UI_LABEL_ABS_LOCKED_USERS_3_DATA,
-    UI_LABEL_ABS_LOCKED_USERS_4_NAME,
-    UI_LABEL_ABS_LOCKED_USERS_4_DATA,
-    UI_LABEL_ABS_LOCKED_USERS_5_NAME,
-    UI_LABEL_ABS_LOCKED_USERS_5_DATA,
-    UI_LABEL_ABS_LOCKED_USERS_6_NAME,
-    UI_LABEL_ABS_LOCKED_USERS_6_DATA,
-    UI_LABEL_ABS_LOCKED_PIN_MESSAGE,
-    UI_LABEL_ABS_DTOP_POPUP_TAG,
-    UI_LABEL_ABS_DTOP_POPUP_MESSAGE,
-    UI_LABEL_ABS_DTOP_NOTIFY_USER,
-    UI_LABEL_ABS_HOME_USER_LOGGED_NAME,
-    UI_LABEL_ABS_LOADER_DATA,
-    UI_LABEL_ABS_COUNT
-} ui_label_abs_id_t;
+esp_err_t ui_screen_loader(ScreensEnum screens_ids, ScreensEnum change_screen);
 
 /**
  * @brief Actualiza el texto de un label usando su buffer estático en PSRAM.
@@ -333,16 +279,6 @@ esp_err_t ui_obj_set_hidden(lv_obj_t *obj, bool hidden);
 /* ══════════════════════════════════════════════════════════════════
  *  Specific
  * ══════════════════════════════════════════════════════════════════ */
- 
-/**
- * @brief Actualiza el estado de batería en la UI.
- *
- * @param percentage Nivel de carga en porcentaje.
- * @param voltage_mv Voltaje en milivoltios.
- * @param is_charging true si el dispositivo está cargando.
- * @return ESP_OK si el comando fue encolado correctamente.
- */
-esp_err_t ui_battery_set_data(int percentage, int voltage_mv, bool is_charging);
 
 /**
  * @brief Consulta si la pantalla DS_HOME ya fue creada.
@@ -429,31 +365,6 @@ esp_err_t ui_timer_set_auto_delete(lv_timer_t *timer, bool auto_delete);
  * @return ESP_OK si el comando fue encolado correctamente.
  */
 esp_err_t ui_timer_set_user_data(lv_timer_t *timer, void *user_data);
-/* ══════════════════════════════════════════════════════════════════
- *  Backlight
- * ══════════════════════════════════════════════════════════════════ */
-
-/**
- * @brief Enciende la retroiluminación.
- *
- * @return ESP_OK si la operación tuvo éxito.
- */
-esp_err_t ui_backlight_on(void);
-
-/**
- * @brief Apaga la retroiluminación.
- *
- * @return ESP_OK si la operación tuvo éxito.
- */
-esp_err_t ui_backlight_off(void);
-
-/**
- * @brief Ajusta el brillo de la retroiluminación.
- *
- * @param brightness_percent Porcentaje de brillo (0-100).
- * @return ESP_OK si la operación tuvo éxito.
- */
-esp_err_t ui_backlight_set(uint8_t brightness_percent);
 
 #ifdef __cplusplus
 }

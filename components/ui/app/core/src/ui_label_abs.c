@@ -10,31 +10,7 @@
 /* Módulos*/
 #include "objects.h"
 
-static const char *TAG = "ABS Text";
-
-/* ══════════════════════════════════════════════════════════════════
- *                  Tamaños de buffer por label
- * ══════════════════════════════════════════════════════════════════ */
-#define BUF_SIZE_MAX_TIME_FORMAT_HM 7 /* HH:MM\0 */
-#define BUF_SIZE_MAX_TIME_FORMAT_HMS 10 /* HH:MM:SS\0 */
-#define BUF_SIZE_MAX_DATE_FORMAT_DMY 13 /* DD:MM:YYYY\0 */
-#define BUF_SIZE_MAX_DATE_FORMAT_STR 38 /* DD de M del YYYY\0*/ // 13 de agosto del 2026. Toma MAX de names en ES: Septiembre(10)
-
-#define BUF_SIZE_NOTCH_EXT_BAT 17
-
-#define BUF_SIZE_USERS_MAX_NAME 16
-#define BUF_SIZE_USERS_MAX_DATA 28
-
-#define BUF_SIZE_LOCK_PIN_MESSAGE 64
-
-#define BUF_SIZE_DTOP_POPUP_TAG 32
-#define BUF_SIZE_DTOP_POPUP_MESSAGE 128
-
-#define BUF_SIZE_DTOP_NOTIFY_USER 256
-
-#define BUF_SIZE_HOME_USER_LOGGED_NAME 32
-
-#define BUF_SIZE_LOADER_DATA 64
+static const char * const TAG = "ABS_Text";
 
 /* ══════════════════════════════════════════════════════════════════
  *                  Buffers estáticos en PSRAM
@@ -42,7 +18,13 @@ static const char *TAG = "ABS Text";
 static EXT_RAM_BSS_ATTR char buf_notch_hour[BUF_SIZE_MAX_TIME_FORMAT_HM];
 static EXT_RAM_BSS_ATTR char buf_notch_dhour[BUF_SIZE_MAX_TIME_FORMAT_HMS];
 
-static EXT_RAM_BSS_ATTR char buf_notch_ext_bat[BUF_SIZE_NOTCH_EXT_BAT];
+static EXT_RAM_BSS_ATTR char buf_notch_ext_bat[BUF_SIZE_MAX_NOTCH_MESSAGE_SERVICE];
+
+static EXT_RAM_BSS_ATTR char buf_notch_ext_zigbee[BUF_SIZE_MAX_NOTCH_MESSAGE_SERVICE];
+
+static EXT_RAM_BSS_ATTR char buf_notch_ext_ubication[BUF_SIZE_MAX_NOTCH_MESSAGE_SERVICE];
+
+static EXT_RAM_BSS_ATTR char buf_notch_ext_wifi[BUF_SIZE_MAX_NOTCH_MESSAGE_SERVICE];
 
 static EXT_RAM_BSS_ATTR char buf_locked_src_hour[BUF_SIZE_MAX_TIME_FORMAT_HM];
 static EXT_RAM_BSS_ATTR char buf_locked_src_date[BUF_SIZE_MAX_DATE_FORMAT_STR];
@@ -80,6 +62,14 @@ static EXT_RAM_BSS_ATTR char buf_dtop_notify_user[BUF_SIZE_DTOP_NOTIFY_USER];
 static EXT_RAM_BSS_ATTR char buf_home_user_logged_name[BUF_SIZE_HOME_USER_LOGGED_NAME];
 
 static EXT_RAM_BSS_ATTR char buf_loader_data[BUF_SIZE_LOADER_DATA];
+
+static EXT_RAM_BSS_ATTR char buf_sys_metric_sram[BUF_SIZE_SYS_METRIC_MAX_SIZE];
+
+static EXT_RAM_BSS_ATTR char buf_sys_metric_psram[BUF_SIZE_SYS_METRIC_MAX_SIZE];
+
+static EXT_RAM_BSS_ATTR char buf_sys_metric_cpu[BUF_SIZE_SYS_METRIC_MAX_SIZE -3];
+
+
 /* ══════════════════════════════════════════════════════════════════
  *                          Entrada de tabla
  * ══════════════════════════════════════════════════════════════════ */
@@ -107,103 +97,116 @@ static const label_abs_entry_t s_table[UI_LABEL_ABS_COUNT] = {
         .buf_size = BUF_SIZE_MAX_TIME_FORMAT_HMS
     },
     [UI_LABEL_ABS_LOCKED_SCR_HOUR] = {
-        .obj_ptr = &objects.dl_home_lock_time,
+        .obj_ptr = &objects.dlock_home_lock_time,
         .buf = buf_locked_src_hour,
         .buf_size = BUF_SIZE_MAX_TIME_FORMAT_HM
     },
     [UI_LABEL_ABS_LOCKED_SRC_DATE] = {
-        .obj_ptr = &objects.dl_home_lock_date,
+        .obj_ptr = &objects.dlock_home_lock_date,
         .buf = buf_locked_src_date,
         .buf_size = BUF_SIZE_MAX_DATE_FORMAT_STR
     },
     [UI_LABEL_ABS_HOME_SRC_DATE] = {
-        .obj_ptr = &objects.ds_home_datetime,
+        .obj_ptr = &objects.dhome_datetime,
         .buf = buf_home_src_date,
         .buf_size = BUF_SIZE_MAX_DATE_FORMAT_STR
     },
     [UI_LABEL_ABS_LOCKED_USER_SELECTED_NAME] = {
-        .obj_ptr = &objects.dl_home_unlock_user_select_name,
+        .obj_ptr = &objects.dlock_unlock_user_select_name,
         .buf = buf_lock_user_selected_name,
         .buf_size = BUF_SIZE_USERS_MAX_NAME,
     },
     [UI_LABEL_ABS_LOCKED_USER_SELECTED_DATA] = {
-        .obj_ptr = &objects.dl_home_unlock_user_select_data,
+        .obj_ptr = &objects.dlock_unlock_user_select_data,
         .buf = buf_lock_user_selected_data,
         .buf_size = BUF_SIZE_USERS_MAX_DATA,
     },
     [UI_LABEL_ABS_NOTCH_EXT_BAT] = {
         .obj_ptr  = &objects.dtop_notch_exp_dat_bat_data,
         .buf      = buf_notch_ext_bat,
-        .buf_size = BUF_SIZE_NOTCH_EXT_BAT,
+        .buf_size = BUF_SIZE_MAX_NOTCH_MESSAGE_SERVICE,
     },
-    
+    [UI_LABEL_ABS_NOTCH_EXT_WIFI] = {
+        .obj_ptr = &objects.dtop_notch_exp_dat_wifi_data,
+        .buf = buf_notch_ext_wifi,
+        .buf_size = BUF_SIZE_MAX_NOTCH_MESSAGE_SERVICE
+    },
+    [UI_LABEL_ABS_NOTCH_EXT_UBICATION] = {
+        .obj_ptr = &objects.dtop_notch_exp_dat_ubi_data,
+        .buf = buf_notch_ext_ubication,
+        .buf_size = BUF_SIZE_MAX_NOTCH_MESSAGE_SERVICE
+    },
+    [UI_LABEL_ABS_NOTCH_EXT_ZIGBEE] = {
+        .obj_ptr = &objects.dtop_notch_exp_dat_iot_data,
+        .buf = buf_notch_ext_zigbee,
+        .buf_size = BUF_SIZE_MAX_NOTCH_MESSAGE_SERVICE
+    },
     [UI_LABEL_ABS_LOCKED_USERS_1_NAME] = {
-        .obj_ptr  = &objects.dl_home_unlock_userpick_1_name,
+        .obj_ptr  = &objects.dlock_unlock_userpick_1_name,
         .buf      = buf_users_1_name,
         .buf_size = BUF_SIZE_USERS_MAX_NAME,
     },
     [UI_LABEL_ABS_LOCKED_USERS_1_DATA] = {
-        .obj_ptr  = &objects.dl_home_unlock_userpick_1_data,
+        .obj_ptr  = &objects.dlock_unlock_userpick_1_data,
         .buf      = buf_users_1_data,
         .buf_size = BUF_SIZE_USERS_MAX_DATA,
     },
-
     [UI_LABEL_ABS_LOCKED_USERS_2_NAME] = {
-        .obj_ptr  = &objects.dl_home_unlock_userpick_2_name,
+        .obj_ptr  = &objects.dlock_unlock_userpick_2_name,
         .buf      = buf_users_2_name,
         .buf_size = BUF_SIZE_USERS_MAX_NAME,
     },
     [UI_LABEL_ABS_LOCKED_USERS_2_DATA] = {
-        .obj_ptr  = &objects.dl_home_unlock_userpick_2_data,
+        .obj_ptr  = &objects.dlock_unlock_userpick_2_data,
         .buf      = buf_users_2_data,
         .buf_size = BUF_SIZE_USERS_MAX_DATA,
     },
 
     [UI_LABEL_ABS_LOCKED_USERS_3_NAME] = {
-        .obj_ptr  = &objects.dl_home_unlock_userpick_3_name,
+        .obj_ptr  = &objects.dlock_unlock_userpick_3_name,
         .buf      = buf_users_3_name,
         .buf_size = BUF_SIZE_USERS_MAX_NAME,
     },
     [UI_LABEL_ABS_LOCKED_USERS_3_DATA] = {
-        .obj_ptr  = &objects.dl_home_unlock_userpick_3_data,
+        .obj_ptr  = &objects.dlock_unlock_userpick_3_data,
         .buf      = buf_users_3_data,
         .buf_size = BUF_SIZE_USERS_MAX_DATA,
     },
 
     [UI_LABEL_ABS_LOCKED_USERS_4_NAME] = {
-        .obj_ptr  = &objects.dl_home_unlock_userpick_4_name,
+        .obj_ptr  = &objects.dlock_unlock_userpick_4_name,
         .buf      = buf_users_4_name,
         .buf_size = BUF_SIZE_USERS_MAX_NAME,
     },
     [UI_LABEL_ABS_LOCKED_USERS_4_DATA] = {
-        .obj_ptr  = &objects.dl_home_unlock_userpick_4_data,
+        .obj_ptr  = &objects.dlock_unlock_userpick_4_data,
         .buf      = buf_users_4_data,
         .buf_size = BUF_SIZE_USERS_MAX_DATA,
     },
 
     [UI_LABEL_ABS_LOCKED_USERS_5_NAME] = {
-        .obj_ptr  = &objects.dl_home_unlock_userpick_5_name,
+        .obj_ptr  = &objects.dlock_unlock_userpick_5_name,
         .buf      = buf_users_5_name,
         .buf_size = BUF_SIZE_USERS_MAX_NAME,
     },
     [UI_LABEL_ABS_LOCKED_USERS_5_DATA] = {
-        .obj_ptr  = &objects.dl_home_unlock_userpick_5_data,
+        .obj_ptr  = &objects.dlock_unlock_userpick_5_data,
         .buf      = buf_users_5_data,
         .buf_size = BUF_SIZE_USERS_MAX_DATA,
     },
 
     [UI_LABEL_ABS_LOCKED_USERS_6_NAME] = {
-        .obj_ptr  = &objects.dl_home_unlock_userpick_6_name,
+        .obj_ptr  = &objects.dlock_unlock_userpick_6_name,
         .buf      = buf_users_6_name,
         .buf_size = BUF_SIZE_USERS_MAX_NAME,
     },
     [UI_LABEL_ABS_LOCKED_USERS_6_DATA] = {
-        .obj_ptr  = &objects.dl_home_unlock_userpick_6_data,
+        .obj_ptr  = &objects.dlock_unlock_userpick_6_data,
         .buf      = buf_users_6_data,
         .buf_size = BUF_SIZE_USERS_MAX_DATA,
     },
     [UI_LABEL_ABS_LOCKED_PIN_MESSAGE] = {
-        .obj_ptr  = &objects.dl_home_unlock_pin_message,
+        .obj_ptr  = &objects.dlock_unlock_pin_message,
         .buf      = buf_lock_pin_message,
         .buf_size = BUF_SIZE_LOCK_PIN_MESSAGE, 
     },
@@ -223,7 +226,7 @@ static const label_abs_entry_t s_table[UI_LABEL_ABS_COUNT] = {
         .buf_size = BUF_SIZE_DTOP_NOTIFY_USER
     },
     [UI_LABEL_ABS_HOME_USER_LOGGED_NAME] = {
-        .obj_ptr  = &objects.ds_home_users_name,
+        .obj_ptr  = &objects.dhome_user_login_name,
         .buf      = buf_home_user_logged_name,
         .buf_size = BUF_SIZE_HOME_USER_LOGGED_NAME,
     },
@@ -231,6 +234,21 @@ static const label_abs_entry_t s_table[UI_LABEL_ABS_COUNT] = {
         .obj_ptr  = &objects.dload_firmware_data_lbl,
         .buf      = buf_loader_data,
         .buf_size = BUF_SIZE_LOADER_DATA
+    },
+    [UI_LABEL_ABS_HOME_SYS_CPU] = {
+        .obj_ptr = &objects.dhome_act_home_syst_cpu,
+        .buf = buf_sys_metric_cpu,
+        .buf_size = BUF_SIZE_SYS_METRIC_MAX_SIZE -3,
+    },
+    [UI_LABEL_ABS_HOME_SYS_SRAM] = {
+        .obj_ptr = &objects.dhome_act_home_syst_intram,
+        .buf = buf_sys_metric_sram,
+        .buf_size = BUF_SIZE_SYS_METRIC_MAX_SIZE,
+    },
+    [UI_LABEL_ABS_HOME_SYS_PSRAM] = {
+        .obj_ptr = &objects.dhome_act_home_syst_psram,
+        .buf = buf_sys_metric_psram,
+        .buf_size = BUF_SIZE_SYS_METRIC_MAX_SIZE
     }
 };
 

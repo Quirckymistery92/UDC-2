@@ -51,27 +51,6 @@ lv_indev_t *lvgl_porting_touch_init(lv_display_t *disp);
  */
 void lvgl_porting_set_task_handle(TaskHandle_t task);
 
-/**
- * @brief Control de encendido de Backlght (Helper)
- *
- * @return ESP_OK on success
- */
-esp_err_t lvgl_porting_backlight_on(void);
-
-/**
- * @brief Control de apagado del Backlight (Helper)
- *
- * @return ESP_OK on success
- */
-esp_err_t lvgl_porting_backlight_off(void);
-
-/**
- * @brief Control de brillo del Backlight
- *
- * @return ESP_OK on success
- */
-esp_err_t lvgl_porting_backlight_set(uint8_t pct);
-
 #ifdef __cplusplus
 }
 #endif

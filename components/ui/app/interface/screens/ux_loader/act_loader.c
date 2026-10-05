@@ -47,6 +47,6 @@ static void ui_int__cb_ds_loader(lv_event_t *e) {
 }
 
 void ui_int__act_display_loader_start_act(void) {
-    lv_obj_add_event_cb(objects.ds_loader, ui_int__cb_ds_loader, LV_EVENT_SCREEN_LOADED, NULL);
-    lv_obj_add_event_cb(objects.ds_loader, ui_int__cb_ds_loader, LV_EVENT_SCREEN_UNLOADED, NULL);
+    lv_obj_add_event_cb(objects.display_loader, ui_int__cb_ds_loader, LV_EVENT_SCREEN_LOADED, NULL);
+    lv_obj_add_event_cb(objects.display_loader, ui_int__cb_ds_loader, LV_EVENT_SCREEN_UNLOADED, NULL);
 }

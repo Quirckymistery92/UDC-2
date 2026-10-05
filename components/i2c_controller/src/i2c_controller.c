@@ -9,15 +9,21 @@
 #include "esp_log.h"
 #include "esp_check.h"
 
-static const char *TAG = "i2c_ctrl";
+/* Variables */
+    #define TAG "UDC_I2C"
 
-static i2c_master_bus_handle_t s_bus_handle = NULL;
+    static i2c_master_bus_handle_t s_bus_handle = NULL;
 
-esp_err_t i2c_controller_init(void)
+    static app_desc_status_t apd = {
+        .app_desc =  DSC_DRIVER_COMM_I2C,
+        .app_name = "Controlador i2c",
+        .app_tag = TAG,
+        .init_result = ESP_OK
+    };
+
+app_desc_status_t *i2c_controller_init(void)
 {
-    if (s_bus_handle != NULL) {
-        return ESP_OK;
-    }
+    DSC_RETURN_STRUCT_ON_FALSE(s_bus_handle == NULL, &apd, ESP_OK);
 
     i2c_master_bus_config_t cfg = {
         .i2c_port          = I2C_CTRL_PORT,
@@ -32,11 +38,13 @@ esp_err_t i2c_controller_init(void)
         },
     };
 
-    ESP_RETURN_ON_ERROR(i2c_new_master_bus(&cfg, &s_bus_handle),
-                        TAG, "Bus init failed");
-    ESP_LOGI(TAG, "I2C master bus ready (port=%d SDA=%d SCL=%d)",
+    esp_err_t ret = i2c_new_master_bus(&cfg, &s_bus_handle);
+    DSC_RETURN_STRUCT_ON_FALSE(ret == ESP_OK, &apd, ret);
+    
+    ESP_LOGD(TAG, "I2C master bus ready (port=%d SDA=%d SCL=%d)",
              I2C_CTRL_PORT, I2C_CTRL_SDA, I2C_CTRL_SCL);
-    return ESP_OK;
+
+    return DESC_AP_INSERT(&apd, ret);
 }
 
 esp_err_t i2c_controller_get_bus_handle(i2c_master_bus_handle_t *ret_handle)

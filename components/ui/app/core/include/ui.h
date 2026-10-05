@@ -19,6 +19,10 @@
 
 /* Módulos */
 #include <lvgl.h>
+#include "ui_zb_types.h"
+#include "ui_label_abs.h"
+#include "ui_image_sia.h"
+#include "desc_apps.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -91,7 +95,14 @@ typedef enum {
     LVGL_CMD_TIMER_SET_AUTO_DELETE,
     LVGL_CMD_TIMER_SET_USER_DATA,
 
+    /* Zigbee Hall */
+    LVGL_CMD_ZB_REGISTER, /* Registra el dispositivo Zigbee */
+    LVGL_CMD_ZB_UNREGISTER, /* Eliminar registros de un dispositivo Zigbee */
+    LVGL_CMD_ZB_UPDATE_LOADING, /* Settea un visual loading de un dispositivo Zigbee */
+    LVGL_CMD_ZB_UPDATE_DATA, /* Actualizar datos de un dispositivo Zigbee */
 
+    LVGL_CMD_SYS_DRIVER_WIFI, /* Controlador visual y estético de WiFi */
+    LVGL_CMD_SYS_DRIVER_ZIGBEE, /* Controlador visual y estético de Zigbee */
 
     LVGL_CMD_MAX
 } lvgl_cmd_t;
@@ -180,8 +191,8 @@ typedef union {
     } obj_user_data;
     
     struct {
-        int percentage;
-        int voltage_mv;
+        uint16_t percentage;
+        bool driver_ok;
         bool is_charging;
     }spc_bat_set_data;
 
@@ -209,7 +220,30 @@ typedef union {
         uint8_t screen_id_mask;
         uint8_t load;
     } sys_load_screens;
-    
+
+    struct {
+        uint16_t id;
+        ui_zb_callback_result_t result_cb;
+        union {
+            struct {
+                char name[MAX_DEV_NAME_LEN];
+                ui_zb_type_dev_t type;
+                uint8_t col;
+                uint8_t row;
+            }register_dev;
+
+            ui_zb_update_data_t update_data;
+            bool is_loading;
+        }payload;
+
+    } zigbee_hall;
+
+    struct {
+        char state_message[BUF_SIZE_MAX_NOTCH_MESSAGE_SERVICE];
+        bool driver_ok;
+        ui_icon_id_t icon;
+    }drivers;
+
 } lvgl_cmd_data_t;
 
 /* ══════════════════════════════════════════════════════════════════
@@ -225,7 +259,7 @@ typedef struct {
  *  Internal API (used by ui_manager.c within the component)
  * ══════════════════════════════════════════════════════════════════ */
 
-esp_err_t lvgl_init(void);
+app_desc_status_t *lvgl_init(void);
 esp_err_t lvgl_enqueue_cmd(const lvgl_msg_t *msg, uint32_t timeout_ms);
 
 bool lvgl_porting_lock(uint32_t timeout_ms);

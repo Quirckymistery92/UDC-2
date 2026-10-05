@@ -10,9 +10,13 @@
 
 #pragma once
 
+/* ESP */
 #include <stdint.h>
 #include "esp_err.h"
+
+/* Módulos */
 #include "lvgl.h"
+#include "desc_apps.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -128,9 +132,8 @@ typedef struct {
  * Creates the internal FreeRTOS FIFO task and queue.
  * Must be called once before any handle is created.
  *
- * @return ESP_OK | ESP_ERR_NO_MEM | ESP_FAIL
  */
-esp_err_t jpegc_element_init(void);
+app_desc_status_t* jpegc_element_init(void);
 
 /**
  * @brief Create and configure a new decoder handle.

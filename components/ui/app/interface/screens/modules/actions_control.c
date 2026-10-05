@@ -9,7 +9,7 @@
 #include "ui_manager.h"
 #include "clock_control.h"
 #include "jpegc_element.h"
-
+#include "littlefs_controller.h"
 /**
  * @brief Handles and extra
  * 
@@ -17,7 +17,7 @@
 
  static jpegc_element_handle_t jpegc_handle1;
  static jpegc_element_handle_t jpegc_handle2;
- static const char *TAG = "UI Internal";
+ static const char * const TAG = "UI Internal";
  
 /***************** Callbacks for JPEGc Element *****************/
 /**
@@ -53,7 +53,7 @@ esp_err_t ui_int_sys_actions_init(void)
         .post_cb = jpegc_element_cb_post,
         .intr_priority = 1,
         .timeout_ms = 500,
-        .fs_letter = "/fatfs",
+        .fs_letter = LITTLEFS_MOUNT_POINT,
         .fs_default_dir = "images",
         
     };
@@ -74,21 +74,21 @@ esp_err_t ui_int_sys_actions_init(void)
 //**********************************************************************/
 // Jpegc Element Actions. Cambiar y/o añadir background a una imagen. PUBLIC API INTERNAL.
 //**********************************************************************/
-esp_err_t ui_pub_actions_backg_update_DSHOME(const char *image_path)
+esp_err_t ui_pub_actions_backg_update_disp_home(const char *image_path)
 {
     jpegc_element_process_data_t process_data = {
         .input_path = image_path,
-        .target_obj = objects.ds_home,
+        .target_obj = objects.display_home,
     };
     esp_err_t err = jpegc_element_process(jpegc_handle1, &process_data);
     ESP_RETURN_ON_FALSE(err == ESP_OK, ESP_FAIL, TAG, "Failed to update background image with JPEGc: %d", err);
     return ESP_OK;
 }
-esp_err_t ui_pub_actions_backg_update_DSLOCKED(const char *image_path)
+esp_err_t ui_pub_actions_backg_update_disp_lock(const char *image_path)
 {
     jpegc_element_process_data_t process_data = {
         .input_path = image_path,
-        .target_obj = objects.ds_locked,
+        .target_obj = objects.display_lock,
     };
     esp_err_t err = jpegc_element_process(jpegc_handle2, &process_data);
     ESP_RETURN_ON_FALSE(err == ESP_OK, ESP_FAIL, TAG, "Failed to update background image with JPEGc: %d", err);

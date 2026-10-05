@@ -27,7 +27,7 @@
 /* ══════════════════════════════════════════════════════════════════
  *                        Global Variables
  * ══════════════════════════════════════════════════════════════════ */
-static const char *TAG = "lvgl_porting";
+static const char * const TAG = "lvgl_porting";
 
 #define LVGL_H_RES      LCD_H_RES
 #define LVGL_V_RES      LCD_V_RES
@@ -190,17 +190,12 @@ void lvgl_porting_set_task_handle(TaskHandle_t task)
 lv_display_t *lvgl_porting_display_init(void)
 {
     ESP_ERROR_CHECK(display_lcd_init(&s_lcd_handles));
-    ESP_LOGI(TAG, "Display hardware initialised (JD9365 MIPI-DSI, num_fbs=%d, %d fps)",
-             LCD_DPI_BUFFER_NUMS, LCD_TARGET_FPS);
 
     void *fb0 = NULL, *fb1 = NULL;
     ESP_ERROR_CHECK(esp_lcd_dpi_panel_get_frame_buffer(
                         s_lcd_handles.panel, 2, &fb0, &fb1));
     s_fb0 = fb0;
     s_fb1 = fb1;
-    ESP_LOGI(TAG, "Driver fbs: [0]=%p [1]=%p (%u B each)",
-             fb0, fb1, (unsigned)FRAME_BUF_SIZE);
-
     s_vsync_sem = xSemaphoreCreateBinary();
 
     // Iniciar tarea background de sincronización (Alta prioridad)
@@ -231,28 +226,27 @@ lv_display_t *lvgl_porting_display_init(void)
         lv_timer_set_period(refr_timer, LCD_FRAME_PERIOD_MS);
     }
 
-    ESP_LOGI(TAG, "Display ready: %dx%d RGB565 DIRECT+sync, driver PSRAM fbs, %d fps cap",
+    ESP_LOGI(TAG, "Display ready: %dx%d RGB565 DIRECT+sync,, %d fps limit",
              LVGL_H_RES, LVGL_V_RES, LCD_TARGET_FPS);
     return disp;
 }
 
 lv_indev_t *lvgl_porting_touch_init(lv_display_t *disp)
 {
-    ESP_LOGI(TAG, "Initializing touch...");
     if (display_touch_init(&s_touch_handle) != ESP_OK) {
-        ESP_LOGE(TAG, "Touch controller init failed"); return NULL;
+        ESP_LOGE(TAG, "Touch controller init failed");
+        return NULL;
     }
     lv_indev_t *indev = lv_indev_create();
-    if (!indev) { ESP_LOGE(TAG, "lv_indev_create failed"); return NULL; }
+
+    if (!indev) {
+      ESP_LOGE(TAG, "lv_indev_create failed");
+      return NULL;
+    }
     lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
     lv_indev_set_display(indev, disp);
     lv_indev_set_read_cb(indev, touch_read_cb);
+
     ESP_LOGI(TAG, "Touch initialised");
     return indev;
 }
-/* ══════════════════════════════════════════════════════════════════
- *                          Backlight
- * ══════════════════════════════════════════════════════════════════ */
-esp_err_t lvgl_porting_backlight_on(void)            { return display_lcd_backlight_on(); }
-esp_err_t lvgl_porting_backlight_off(void)           { return display_lcd_backlight_off(); }
-esp_err_t lvgl_porting_backlight_set(uint8_t pct)        { return display_lcd_brightness_set(pct); }

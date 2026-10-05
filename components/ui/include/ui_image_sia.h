@@ -38,13 +38,8 @@ typedef enum {
   UI_ICON_BAT_LOW,       /**< Batería baja                */
   UI_ICON_BAT_MED,       /**< Batería media               */
   UI_ICON_BAT_MAX,       /**< Batería máxima              */
-  UI_ICON_IOT_ACTIVE,    /**< IoT activo                  */
   UI_ICON_WIFI_ON,       /**< WiFi conectado              */
   UI_ICON_WIFI_OFF,      /**< WiFi desconectado           */
-  UI_ICON_IOT_FACE_ID,   /**< IoT Face ID                 */
-  UI_ICON_MENUDOT_V,     /**< Menú punto vertical         */
-  UI_ICON_INFORMATION30, /**< Icono de información 30px  */
-  UI_ICON_WARNING30,     /**< Icono de advertencia 30px  */
 
   UI_ICON_USER_LOGO_DEFAULT,    /**< Logo de usuario             */
   UI_ICON_USER_LOGO_BABY,       /**< Logo de bebé                */
@@ -70,14 +65,38 @@ typedef enum {
   UI_ICON_USER_LOGO_VERY_HAPPY, /**< Logo de usuario muy feliz   */
   UI_ICON_USER_LOGO_WORRIED,    /**< Logo de usuario cara asombro*/
 
-  /* ── Añadir nuevos íconos antes de esta línea ────────────────── */
+  UI_ICON_ZB_LIGHT_ON,
+  UI_ICON_ZB_LIGHT_OFF,
+  UI_ICON_ZB_LIGHT_ERROR,
+  UI_ICON_ZB_LIGHT_AMBIENT,
+  UI_ICON_ZB_TEMPERATURE,
+  UI_ICON_ZB_SWITCH_ON,
+  UI_ICON_ZB_SWITCH_OFF,
+  UI_ICON_ZB_SWITCH_ERROR,
+
   UI_ICON_COUNT /**< Total de íconos (centinela) */
 } ui_icon_id_t;
+
+typedef enum {
+  UI_IMAGE_NONE = 0, /**< Imagen nula (centinela) */
+  
+  UI_IMAGE_THUNDER_RAIL,
+  UI_IMAGE_BOSTON_LIGHTS,
+  UI_IMAGE_FOREST_COMMON,
+  UI_IMAGE_LAST_NIGHT,
+  UI_IMAGE_NEW_YORK_TIME,
+  UI_IMAGE_BLUE_CARAMEL,
+  UI_IMAGE_VOLKAN_CLUSTER,
+
+  UI_IMAGE_COUNT /**< Total de imágenes (centinela) */
+}ui_images_id_t;
 
 /* Verificación en compile-time: El enum cabe en uint8_t */ 
 _Static_assert(UI_ICON_COUNT <= 255,
                "ui_icon_id_t: demasiados iconos para uint8_t");
 
+_Static_assert(UI_IMAGE_COUNT <= 255,
+               "ui_images_id_t: demasiadas imágenes para uint8_t");
 #ifdef __cplusplus
 }
 #endif

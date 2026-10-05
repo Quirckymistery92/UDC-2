@@ -18,12 +18,9 @@ extern const lv_img_dsc_t img_bat_ultra_low30;
 extern const lv_img_dsc_t img_bat_low30;
 extern const lv_img_dsc_t img_bat_med30;
 extern const lv_img_dsc_t img_bat_max30;
-extern const lv_img_dsc_t img_iot_active30;
 extern const lv_img_dsc_t img_wifi_on30;
 extern const lv_img_dsc_t img_wifi_off30;
 extern const lv_img_dsc_t img_user_logo_default50;
-extern const lv_img_dsc_t img_menudot_v30;
-extern const lv_img_dsc_t img_bg_thunder_rail;
 extern const lv_img_dsc_t img_location30;
 extern const lv_img_dsc_t img_darrow_top30;
 extern const lv_img_dsc_t img_brightness30;
@@ -66,7 +63,33 @@ extern const lv_img_dsc_t img_firmware_logo;
 extern const lv_img_dsc_t img_device_locked;
 extern const lv_img_dsc_t img_information_only230x280;
 extern const lv_img_dsc_t img_support_assistant120;
-
+extern const lv_img_dsc_t img_zigbee_icon75;
+extern const lv_img_dsc_t img_settings80;
+extern const lv_img_dsc_t img_hardware_chip30;
+extern const lv_img_dsc_t img_hardware_ram30;
+extern const lv_img_dsc_t img_hardware_ram_ext30;
+extern const lv_img_dsc_t img_scenes_autom80;
+extern const lv_img_dsc_t img_wt_pcloudy_day70;
+extern const lv_img_dsc_t img_wt_humidity15;
+extern const lv_img_dsc_t img_wt_winds15;
+extern const lv_img_dsc_t img_wt_rain30;
+extern const lv_img_dsc_t img_light_bulb_on90;
+extern const lv_img_dsc_t img_light_bulb_off90;
+extern const lv_img_dsc_t img_light_bulb_error90;
+extern const lv_img_dsc_t img_switch_on90;
+extern const lv_img_dsc_t img_switch_off90;
+extern const lv_img_dsc_t img_switch_error90;
+extern const lv_img_dsc_t img_temperature90;
+extern const lv_img_dsc_t img_ambient_light90;
+extern const lv_img_dsc_t img_dimmer_light40;
+extern const lv_img_dsc_t img_palet_edit40;
+extern const lv_img_dsc_t img_spectre_image320x110;
+extern const lv_img_dsc_t img_goto_output20;
+extern const lv_img_dsc_t img_action_logout60;
+extern const lv_img_dsc_t img_action_poweroff60;
+extern const lv_img_dsc_t img_action_restart60;
+extern const lv_img_dsc_t img_action_lock60;
+extern const lv_img_dsc_t img_zigbee_icon30;
 #ifdef __cplusplus
 }
 #endif

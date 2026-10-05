@@ -2,7 +2,6 @@
  * SPDX-FileCopyrightText: 2026
  * SPDX-License-Identifier: Apache-2.0
  */
-
 #pragma once
 
 #include <stdbool.h>
@@ -17,6 +16,7 @@ typedef struct {
     int voltage_mv;
     int percentage;
     bool is_charging;
+    bool driver_ok;
 } battery_status_t;
 
 typedef struct {

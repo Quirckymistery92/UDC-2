@@ -24,28 +24,15 @@
 #include "ui_image_sia_internal.h"
 #include "../../private/porting/porting.h"
 #include "interface.h"
+#include "ui_zb_controller.h"
+#include "ui_check.h"
 
-static const char *TAG = "ui_mgr";
-/**
- * @brief Retorna el valor pedido del enum a path const char* para usar con JPEGc (e.g. "bg_thunder_rail.jpg")
- * 
- * @param img Imagen de fondo a convertir
- * @return const char* Ruta de la imagen correspondiente
- */
-const char* ui_backg_img_to_path(ui_backg_img_t img)
-{
-    switch (img) {
-        case UI_IMG_THUNDER_RAIL: return "bg_thunder_rail.jpg";
-        default: return NULL;
-    }
-}
 /* ══════════════════════════════════════════════════════════════════
  *  Initialization & Control
  * ══════════════════════════════════════════════════════════════════ */
 
-esp_err_t ui_init(void)
+app_desc_status_t *ui_init(void)
 {
-    ESP_LOGI(TAG, "UI subsystem initializing...");
     return lvgl_init();
 
 }
@@ -56,16 +43,16 @@ void ui__helper_sync_sys_screens_get_semaphore(void) {
 /* ══════════════════════════════════════════════════════════════════
  *  Screen
  * ══════════════════════════════════════════════════════════════════ */
-esp_err_t ui_screen_loader(ScreensEnum screens_ids, ScreensEnum one_screen_load)
+esp_err_t ui_screen_loader(ScreensEnum screens_ids, ScreensEnum change_screen)
 {
     if (screens_ids == SCREEN_MASK_NONE) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (one_screen_load != SCREEN_MASK_NONE &&
-        (one_screen_load == SCREEN_MASK_ALL ||
-         (one_screen_load & SCREEN_MASK_ALL) != one_screen_load ||
-         (one_screen_load & (one_screen_load - 1U)) != 0)) {
+    if (change_screen != SCREEN_MASK_NONE &&
+        (change_screen == SCREEN_MASK_ALL ||
+         (change_screen & SCREEN_MASK_ALL) != change_screen ||
+         (change_screen & (change_screen - 1U)) != 0)) {
         return ESP_ERR_INVALID_ARG;
     }
     
@@ -73,7 +60,7 @@ esp_err_t ui_screen_loader(ScreensEnum screens_ids, ScreensEnum one_screen_load)
         .cmd = LVGL_CMD_SYS_LOAD_SCREENS,
         .data.sys_load_screens = {
             .screen_id_mask = (uint8_t)screens_ids,
-            .load = (uint8_t)one_screen_load,
+            .load = (uint8_t)change_screen,
         },
     };
     return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
@@ -101,14 +88,6 @@ esp_err_t ui_screen_change(ScreensEnum screen_id,
         },
     };
     return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
-}
-
-// Método Asíncrono para actualizar fondo de pantalla de Home
-esp_err_t ui_async_screen_backg_update_DSHOME(ui_backg_img_t img, lv_obj_t *obj)
-{
-    const char *image_path = ui_backg_img_to_path(img);
-    if (!image_path) return ESP_ERR_INVALID_ARG;
-    return ui_pub_actions_backg_update_DSHOME(image_path);
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -269,7 +248,7 @@ esp_err_t ui_image_set_src_by_id(lv_obj_t *obj, ui_icon_id_t icon_id)
     if (!obj || icon_id >= UI_ICON_COUNT) {
         return ESP_ERR_INVALID_ARG;
     }
-    const lv_img_dsc_t *src = images_ctl_internal_get_src(icon_id);
+    const lv_img_dsc_t *src = ui_int__sia_icons_get_src_by_id(icon_id);
     if (!src) {
         return ESP_ERR_INVALID_ARG;
     }
@@ -380,7 +359,6 @@ esp_err_t ui_timer_set_auto_delete(lv_timer_t *timer, bool auto_delete) {
   };
   return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
 }
-
 esp_err_t ui_timer_set_user_data(lv_timer_t *timer, void *user_data) {
   if (!timer)
     return ESP_ERR_INVALID_ARG;
@@ -393,17 +371,7 @@ esp_err_t ui_timer_set_user_data(lv_timer_t *timer, void *user_data) {
 /* ══════════════════════════════════════════════════════════════════
  *  Specific
  * ══════════════════════════════════════════════════════════════════ */
-esp_err_t ui_battery_set_data(int percentage, int voltage_mv, bool is_charging)
-{
-    if (percentage < 0 || percentage > 100) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    lvgl_msg_t msg = {
-        .cmd = LVGL_CMD_SPC_BAT_SET_DATA,
-        .data.spc_bat_set_data = { .percentage = percentage, .voltage_mv = voltage_mv, .is_charging = is_charging },
-    };
-    return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
-}
+
 bool ui_display_is_created_ds_home(void) {
     return ui_int__display_is_created_ds_home();
 }
@@ -430,9 +398,87 @@ esp_err_t ui_spc_send_notify_user(bool is_alert, const char *fmt, ...)
     return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
 }
 /* ══════════════════════════════════════════════════════════════════
- *  Backlight (direct, no queue)
+ *  Zigbee Hall
  * ══════════════════════════════════════════════════════════════════ */
+esp_err_t ui_zb_hall_register_device(uint16_t id, const char *name, ui_zb_type_dev_t type, uint8_t column, uint8_t row, ui_zb_callback_result_t cb_result)
+{
+    if (name == NULL) return ESP_ERR_INVALID_ARG;
+    
+    size_t len_name = strlen(name);
+    if (len_name < 5 || len_name >= MAX_DEV_NAME_LEN) return ESP_ERR_INVALID_ARG;
 
-esp_err_t ui_backlight_on(void)                   { return lvgl_porting_backlight_on(); }
-esp_err_t ui_backlight_off(void)                  { return lvgl_porting_backlight_off(); }
-esp_err_t ui_backlight_set(uint8_t brightness_percent) { return lvgl_porting_backlight_set(brightness_percent); }
+    lvgl_msg_t msg = {
+        .cmd = LVGL_CMD_ZB_REGISTER,
+        .data.zigbee_hall = { .id = id, .result_cb = cb_result, .payload.register_dev = { .col = column, .row = row, .type = type} }
+    };
+    strlcpy(msg.data.zigbee_hall.payload.register_dev.name, name, MAX_DEV_NAME_LEN);
+
+    return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
+}
+esp_err_t ui_zb_hall_unregister_device(uint16_t id, ui_zb_callback_result_t cb_result)
+{
+    lvgl_msg_t msg = {
+        .cmd = LVGL_CMD_ZB_UNREGISTER,
+        .data.zigbee_hall = { .id = id, .result_cb = cb_result}
+    };
+
+    return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
+}
+esp_err_t ui_zb_hall_update_device(uint16_t id, ui_zb_update_data_t data, ui_zb_callback_result_t cb_result)
+{
+    lvgl_msg_t msg = {
+        .cmd = LVGL_CMD_ZB_UPDATE_DATA,
+        .data.zigbee_hall = { .id = id, .result_cb = cb_result, .payload.update_data = data}
+    };
+
+    return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
+}
+esp_err_t ui_zb_hall_set_loading_device(uint16_t id, bool is_loading, ui_zb_callback_result_t cb_result)
+{
+    lvgl_msg_t msg = {
+        .cmd = LVGL_CMD_ZB_UPDATE_LOADING,
+        .data.zigbee_hall = {.id = id, .result_cb = cb_result, .payload.is_loading = is_loading}
+    };
+    
+    return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+ *  Drivers (Export to API ui_drivers.h)
+ * ══════════════════════════════════════════════════════════════════ */
+esp_err_t ui__drivers_state_push_wifi(const char* driver_message, bool driver_ok, ui_icon_id_t driver_icon)
+{
+    UX_CHECK_ABSOLUTE_EXCLUSIVE_CHAR(driver_message,BUF_SIZE_MAX_NOTCH_MESSAGE_SERVICE, 0);
+
+    lvgl_msg_t msg = {
+        .cmd = LVGL_CMD_SYS_DRIVER_WIFI,
+        .data.drivers = {.driver_ok = driver_ok, .icon = driver_icon }
+    };
+    strlcpy(msg.data.drivers.state_message, driver_message,BUF_SIZE_MAX_NOTCH_MESSAGE_SERVICE);
+
+    return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
+}
+
+esp_err_t ui__drivers_state_push_zigbee(const char* driver_message, bool driver_ok)
+{
+    UX_CHECK_ABSOLUTE_EXCLUSIVE_CHAR(driver_message,BUF_SIZE_MAX_NOTCH_MESSAGE_SERVICE, 0);
+
+    lvgl_msg_t msg = {
+        .cmd = LVGL_CMD_SYS_DRIVER_WIFI,
+        .data.drivers.driver_ok = driver_ok
+    };
+    strlcpy(msg.data.drivers.state_message, driver_message,BUF_SIZE_MAX_NOTCH_MESSAGE_SERVICE);
+
+    return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
+}
+esp_err_t ui__drivers_battery_set_status(int percentage, bool is_charging, bool driver_ok)
+{
+    if (percentage < 0 || percentage > 100) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    lvgl_msg_t msg = {
+        .cmd = LVGL_CMD_SPC_BAT_SET_DATA,
+        .data.spc_bat_set_data = { .percentage = percentage, .driver_ok = driver_ok, .is_charging = is_charging },
+    };
+    return lvgl_enqueue_cmd(&msg, UI_CMD_TIMEOUT_MS);
+}

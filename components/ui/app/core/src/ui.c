@@ -28,25 +28,27 @@
 #include "interface.h"
 #include "../../private/porting/porting.h"
 #include "images.h"
+#include "ui_zb_controller.h"
 
+/* Variables */
+    static TaskHandle_t      g_lvgl_task      = NULL;
+    static QueueHandle_t     g_lvgl_queue     = NULL;
+    static SemaphoreHandle_t  g_sync_handle     = NULL;
+    static uint32_t          g_lvgl_next_timeout = 0;
+    static const char * const TAG = "lvgl_ui";
+    static app_desc_status_t apd = {
+        .app_desc = DSC_APP_UX,
+        .app_name = "UX Graphics",
+        .app_tag = TAG,
+        .init_result = ESP_OK
+    };
 
-/* ══════════════════════════════════════════════════════════════════
- *                              Global Variables
- * ══════════════════════════════════════════════════════════════════ */
-
-
-static TaskHandle_t      g_lvgl_task      = NULL;
-static QueueHandle_t     g_lvgl_queue     = NULL;
-static SemaphoreHandle_t  g_sync_handle     = NULL;
-static uint32_t          g_lvgl_next_timeout = 0;
-static const char *TAG = "lvgl_ui";
-
-#define LVGL_TASK_STACK_SIZE        (32 * 1024)
-#define LVGL_TASK_PRIORITY          (CONFIG_LVGL_TASK_PRIORITY)
-#define LVGL_QUEUE_LENGTH           (32)
-#define LVGL_PORT_TASK_MAX_DELAY_MS (500)
-#define LVGL_PORT_TASK_MIN_DELAY_MS (1)
-#define LVGL_TICK_PERIOD_MS         (CONFIG_LVGL_TICK_PERIOD_MS)
+    #define LVGL_TASK_STACK_SIZE        (32 * 1024)
+    #define LVGL_TASK_PRIORITY          (20) //(CONFIG_LVGL_TASK_PRIORITY)
+    #define LVGL_QUEUE_LENGTH           (32)
+    #define LVGL_PORT_TASK_MAX_DELAY_MS (500)
+    #define LVGL_PORT_TASK_MIN_DELAY_MS (1)
+    #define LVGL_TICK_PERIOD_MS         (CONFIG_LVGL_TICK_PERIOD_MS)
 
 /* ══════════════════════════════════════════════════════════════════
  *                              Helpers
@@ -227,60 +229,12 @@ static void lvgl_process_cmd(const lvgl_msg_t *msg)
         break;
 
     case LVGL_CMD_SPC_BAT_SET_DATA:{
-        
-        if(!ui_display_is_created_ds_top()) {
-            ESP_LOGI(TAG, "No se puede aplicar contenido de fecha y hora cuando la display ds_top no está inicializada. girl!");
-            return;
-        }
-        LVGL_CHECK_OBJ_PTR(objects.dtop_notch_min_img_bat);
-        LVGL_CHECK_OBJ_PTR(objects.dtop_notch_exp_dat_bat_img);
-        char message_status_buf[17];
-        const char* message_data = "Error";
+        uint16_t battery_percent = msg->data.spc_bat_set_data.percentage;
+        bool driver_st = msg->data.spc_bat_set_data.driver_ok;
+        bool is_charging = msg->data.spc_bat_set_data.is_charging;
 
-        if(msg->data.spc_bat_set_data.percentage > 100 || msg->data.spc_bat_set_data.percentage < 0)
-        {
-                ESP_LOGW(TAG, "Battery percentage out of range: %d", msg->data.spc_bat_set_data.percentage);
-                goto exit;
-        }
-
-        if(msg->data.spc_bat_set_data.is_charging)
-        {
-            lv_image_set_src(objects.dtop_notch_min_img_bat, &img_bat_charging30);
-            lv_image_set_src(objects.dtop_notch_exp_dat_bat_img, &img_bat_charging30);
-
-            message_data = msg->data.spc_bat_set_data.percentage == 100 ? "%d%% Cargado" : "%d%% Cargando";
-        }
-        else
-        {   
-            message_data = "%d%% descargando";
-            switch(msg->data.spc_bat_set_data.percentage)
-            {
-                case 0 ... 10:
-                    lv_image_set_src(objects.dtop_notch_min_img_bat, &img_bat_ultra_low30);
-                    lv_image_set_src(objects.dtop_notch_exp_dat_bat_img, &img_bat_ultra_low30);
-                    break;
-                case 11 ... 20:
-                    lv_image_set_src(objects.dtop_notch_min_img_bat, &img_bat_low30);
-                    lv_image_set_src(objects.dtop_notch_exp_dat_bat_img, &img_bat_low30);
-                    break;
-                case 21 ... 60:
-                    lv_image_set_src(objects.dtop_notch_min_img_bat, &img_bat_med30);
-                    lv_image_set_src(objects.dtop_notch_exp_dat_bat_img, &img_bat_med30);
-                    break;
-                default:
-                    lv_image_set_src(objects.dtop_notch_min_img_bat, &img_bat_max30);
-                    lv_image_set_src(objects.dtop_notch_exp_dat_bat_img, &img_bat_max30);
-                    break;
-            }
-        }
-
-    exit:
-        
-        snprintf(message_status_buf, sizeof(message_status_buf), message_data, msg->data.spc_bat_set_data.percentage);
-        lv_obj_t   *obj = NULL;
-        const char *buf = NULL;
-        if (label_abs_prepare(UI_LABEL_ABS_NOTCH_EXT_BAT, message_status_buf, &obj, &buf) == ESP_OK){ lv_label_set_text_static(obj, buf); }
-                 
+        esp_err_t ret = ui_int__dtop_battery_state(battery_percent, is_charging, driver_st);
+        if(ret != ESP_OK) ui_int__dtop_notify_user_show(true, "Fallas con el driver de batería.");
     }
     break;
 
@@ -325,11 +279,11 @@ static void lvgl_process_cmd(const lvgl_msg_t *msg)
     break;
     
     case LVGL_CMD_SPC_NOTIFICATION_SHOW:
-        if(!ui_display_is_created_ds_top()) {
+        if(!ui_int__display_is_created_ds_top()) {
             ESP_LOGI(TAG, "No se puede mostrar notificación cuando la display ds_top no está inicializada. girl!");
             return;
         }
-        esp_err_t ret = ui_int__anim_notify_user_show(msg->data.spc_notification_show.is_alert, msg->data.spc_notification_show.msg);
+        esp_err_t ret = ui_int__dtop_notify_user_show(msg->data.spc_notification_show.is_alert, msg->data.spc_notification_show.msg);
         if(ret != ESP_OK) {
             ESP_LOGE(TAG, "Error al mostrar notificación: %s", esp_err_to_name(ret));
         }
@@ -359,8 +313,8 @@ static void lvgl_process_cmd(const lvgl_msg_t *msg)
             }
         }
         if(mask & SCREEN_ID_DS_CONFIG) {
-            if(!ui_int__display_is_created_ds_config()) {
-                ui_int__display_create_ds_config();
+            if(!ui_int__display_is_created_ds_settings()) {
+                ui_int__display_create_ds_settings();
             }
         }
         if(mask & SCREEN_ID_DS_BLOCK) {
@@ -385,6 +339,81 @@ static void lvgl_process_cmd(const lvgl_msg_t *msg)
         ui_int__helper_clear_lock_waiting_screen();
     }
         break;
+
+    case LVGL_CMD_ZB_REGISTER:{
+        uint16_t id_dev = msg->data.zigbee_hall.id;
+        ui_zb_callback_result_t cb_dev = msg->data.zigbee_hall.result_cb;
+
+        if(!ui_int__display_is_created_ds_home()) {
+            if(cb_dev) cb_dev(id_dev, ESP_ERR_NOT_ALLOWED);
+            break;
+        }
+
+        const char* name_dev = msg->data.zigbee_hall.payload.register_dev.name;
+
+        ui_zb_type_dev_t type_dev = msg->data.zigbee_hall.payload.register_dev.type;
+
+        uint8_t row_grid = msg->data.zigbee_hall.payload.register_dev.row;
+        uint8_t col_grid = msg->data.zigbee_hall.payload.register_dev.col;
+
+        esp_err_t ret = ui_zb_device_register(id_dev, name_dev, type_dev, col_grid, row_grid);
+
+        if(cb_dev) cb_dev(id_dev, ret);
+        break;
+    }
+    case LVGL_CMD_ZB_UNREGISTER:{
+        uint16_t id_dev = msg->data.zigbee_hall.id;
+        ui_zb_callback_result_t cb_dev = msg->data.zigbee_hall.result_cb;
+
+        esp_err_t ret = ui_zb_device_remove(id_dev);
+        
+        if(cb_dev) cb_dev(id_dev, ret);
+        break;
+    }
+    case LVGL_CMD_ZB_UPDATE_DATA:{
+        uint16_t id_dev = msg->data.zigbee_hall.id;
+        ui_zb_callback_result_t cb_dev = msg->data.zigbee_hall.result_cb;
+        ui_zb_update_data_t update_data = msg->data.zigbee_hall.payload.update_data;
+
+        esp_err_t ret = ui_zb_device_send_data(id_dev, &update_data);
+
+        if(cb_dev) cb_dev(id_dev, ret);
+
+        break;
+    }
+    case LVGL_CMD_ZB_UPDATE_LOADING:{
+        uint16_t id_dev = msg->data.zigbee_hall.id;
+        ui_zb_callback_result_t cb_dev = msg->data.zigbee_hall.result_cb;
+        bool is_loading = msg->data.zigbee_hall.payload.is_loading;
+
+        esp_err_t ret = ui_zb_device_set_loading(id_dev, is_loading);
+
+        if(cb_dev) cb_dev(id_dev, ret);
+
+        break;
+    }
+
+    case LVGL_CMD_SYS_DRIVER_WIFI:{
+        const char *message = msg->data.drivers.state_message;
+        bool driver_ok = msg->data.drivers.driver_ok;
+        ui_icon_id_t icon = msg->data.drivers.icon;
+
+        esp_err_t ret = ui_int__dtop_wifi_state(message, driver_ok, icon);
+        if(ret != ESP_OK){
+            ESP_LOGI(TAG, "Falló el driver WiFi aplicando el estado en la UX, error: %s", esp_err_to_name(ret));
+        }
+        break;
+    }
+    case LVGL_CMD_SYS_DRIVER_ZIGBEE:{
+        const char *message = msg->data.drivers.state_message;
+        bool driver_ok = msg->data.drivers.driver_ok;
+
+        esp_err_t ret = ui_int__dtop_zigbee_state(message, driver_ok);
+        if(ret != ESP_OK){
+            ESP_LOGI(TAG, "Falló el driver Zigbee aplicando el estado en la UX, error: %s", esp_err_to_name(ret));
+        }
+        break;
+    }
 
     default:
         ESP_LOGW(TAG, "Unknown command: %d", msg->cmd);
@@ -487,53 +516,44 @@ static void lvgl_task(void *arg)
  *                     Internal API Implementation
  * ══════════════════════════════════════════════════════════════════ */
 
-esp_err_t lvgl_init(void)
+app_desc_status_t *lvgl_init(void)
 {
-    ESP_LOGI(TAG, "Initializing LVGL core system...");
+    ESP_LOGI(TAG, "Iniciando UX UDC-2");
 
-    if (g_lvgl_task != NULL) {
-        ESP_LOGW(TAG, "LVGL already initialized");
-        return ESP_OK;
-    }
+    DSC_RETURN_STRUCT_ON_FALSE(g_lvgl_task == NULL, &apd, ESP_OK);
 
     g_lvgl_queue = xQueueCreate(LVGL_QUEUE_LENGTH, sizeof(lvgl_msg_t));
-    if (!g_lvgl_queue) {
-        ESP_LOGE(TAG, "Failed to create queue");
-        return ESP_FAIL;
-    }
+
+    DSC_RETURN_STRUCT_ON_FALSE(g_lvgl_queue != NULL, &apd, ESP_FAIL);
 
     g_sync_handle = xSemaphoreCreateBinary();
     if (!g_sync_handle) {
-        ESP_LOGE(TAG, "Failed to create sync semaphore");
         vQueueDelete(g_lvgl_queue);
-        return ESP_FAIL;
+        return DESC_AP_INSERT(&apd, ESP_FAIL);
     }
 
     const esp_timer_create_args_t tick_timer_args = {
         .callback = lvgl_tick_timer_cb,
-        .name     = "lvgl_tick",
+        .name     = "ux_timer",
     };
     esp_timer_handle_t tick_timer = NULL;
-    ESP_RETURN_ON_ERROR(esp_timer_create(&tick_timer_args, &tick_timer),
-                        TAG, "Tick timer create failed");
-    ESP_RETURN_ON_ERROR(esp_timer_start_periodic(tick_timer, LVGL_TICK_PERIOD_MS * 1000),
-                        TAG, "Tick timer start failed");
 
-    BaseType_t ret = xTaskCreate(lvgl_task, "lvgl_task",
+    esp_err_t err = esp_timer_create(&tick_timer_args, &tick_timer);
+    DSC_RETURN_STRUCT_ON_FALSE(err == ESP_OK, &apd, ESP_FAIL);
+
+    err = esp_timer_start_periodic(tick_timer, LVGL_TICK_PERIOD_MS * 1000);
+    DSC_RETURN_STRUCT_ON_FALSE(err == ESP_OK, &apd, ESP_FAIL);
+    
+    BaseType_t ret = xTaskCreatePinnedToCore(lvgl_task, "UX_UDC",
                                  LVGL_TASK_STACK_SIZE, NULL,
-                                 LVGL_TASK_PRIORITY, &g_lvgl_task);
+                                 LVGL_TASK_PRIORITY, &g_lvgl_task, 1);
     if (ret != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create LVGL task");
         vQueueDelete(g_lvgl_queue);
         vSemaphoreDelete(g_sync_handle);
-        return ESP_FAIL;
+        return DESC_AP_INSERT(&apd, ESP_FAIL);
     }
 
-    esp_err_t err = ESP_OK;
-    ESP_RETURN_ON_FALSE(err == ESP_OK, ESP_FAIL, TAG, "Falló la inicializacion de semáforos internos de UI de gestión síncrona de inicialización");
-
-    ESP_LOGI(TAG, "LVGL core system initialized");
-    return ESP_OK;
+    return DESC_AP_INSERT(&apd, ESP_OK);
 }
 
 esp_err_t lvgl_enqueue_cmd(const lvgl_msg_t *msg, uint32_t timeout_ms)

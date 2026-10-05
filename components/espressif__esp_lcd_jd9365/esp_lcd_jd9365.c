@@ -47,7 +47,7 @@ typedef struct {
     esp_err_t (*init)(esp_lcd_panel_t *panel);
 } jd9365_panel_t;
 
-static const char *TAG = "jd9365";
+static const char * const TAG = "jd9365";
 
 static esp_err_t panel_jd9365_del(esp_lcd_panel_t *panel);
 static esp_err_t panel_jd9365_init(esp_lcd_panel_t *panel);
@@ -59,7 +59,7 @@ static esp_err_t panel_jd9365_disp_on_off(esp_lcd_panel_t *panel, bool on_off);
 esp_err_t esp_lcd_new_panel_jd9365(const esp_lcd_panel_io_handle_t io, const esp_lcd_panel_dev_config_t *panel_dev_config,
                                    esp_lcd_panel_handle_t *ret_panel)
 {
-    ESP_LOGI(TAG, "version: %d.%d.%d", ESP_LCD_JD9365_VER_MAJOR, ESP_LCD_JD9365_VER_MINOR,
+    ESP_LOGD(TAG, "version: %d.%d.%d", ESP_LCD_JD9365_VER_MAJOR, ESP_LCD_JD9365_VER_MINOR,
              ESP_LCD_JD9365_VER_PATCH);
     ESP_RETURN_ON_FALSE(io && panel_dev_config && ret_panel, ESP_ERR_INVALID_ARG, TAG, "invalid arguments");
     jd9365_vendor_config_t *vendor_config = (jd9365_vendor_config_t *)panel_dev_config->vendor_config;
@@ -382,7 +382,7 @@ static esp_err_t panel_jd9365_init(esp_lcd_panel_t *panel)
 
     uint8_t ID[3];
     ESP_RETURN_ON_ERROR(esp_lcd_panel_io_rx_param(io, 0x04, ID, 3), TAG, "read ID failed");
-    ESP_LOGI(TAG, "LCD ID: %02X %02X %02X", ID[0], ID[1], ID[2]);
+    ESP_LOGD(TAG, "LCD ID: %02X %02X %02X", ID[0], ID[1], ID[2]);
 
     ESP_RETURN_ON_ERROR(esp_lcd_panel_io_tx_param(io, JD9365_CMD_PAGE, (uint8_t[]) {
         JD9365_PAGE_USER

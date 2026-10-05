@@ -8,10 +8,14 @@
 
 #pragma once
 
+/* ESP */
 #include <stdint.h>
 #include <stdbool.h>
 #include <time.h>
 #include "esp_err.h"
+
+/* Módulos */
+#include "desc_apps.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,9 +44,8 @@ typedef void (*rtc_rx8025t_cb_t)(rtc_rx8025t_event_t event, const struct tm *tim
  * @param sync_interval_sec Intervalo de sincronización en segundos (ej. 3600 para 1h). 
  *                          Si es 0, no se crea la Task (solo lectura/escritura manual).
  * @param cb                Callback de eventos (puede ser NULL).
- * @return ESP_OK si fue exitoso.
  */
-esp_err_t rtc_rx8025t_init(uint32_t sync_interval_sec, rtc_rx8025t_cb_t cb);
+app_desc_status_t *rtc_rx8025t_init(uint32_t sync_interval_sec, rtc_rx8025t_cb_t cb);
 
 /**
  * @brief Desinicializa el driver, destruye la Task de forma segura y libera el bus.

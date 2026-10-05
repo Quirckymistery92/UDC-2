@@ -3,26 +3,30 @@ idf_component_register(
         "main.c"
         "drivers/display_lcd.c"
         "drivers/display_touch.c"
-        "boot/app_init_normal.c"
         "boot/app_launcher.c"
-        "modules/user_manager/user_manager.c"
+        "boot/nvsm_boot.c"
+
+        #Normal Boot
+        "boot/normal/src/app_init_normal.c"
+        "boot/normal/src/user_manager.c"
+        "boot/normal/src/battery.c"
     INCLUDE_DIRS
         "drivers"
     PRIV_INCLUDE_DIRS
-        "boot"
-        "modules"
-        "modules/user_manager"
+        "boot/include"
+        "boot/normal/include"
     PRIV_REQUIRES
         driver
         esp_lcd
         esp_hw_support
         esp_lcd_touch_gsl3680
         ui
-        fatfs_controller
+        littlefs_controller
         jpegc_element
         i2c_controller
         rtc_time
         battery_guard
         NVSm_sys
-        sys_modules
+        user_management
+        udc_metrics
 )

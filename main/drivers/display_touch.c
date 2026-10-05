@@ -12,7 +12,7 @@
 #include "esp_check.h"
 #include "esp_lcd_touch_gsl3680.h"
 
-static const char *TAG = "display_touch";
+static const char * const TAG = "display_touch";
 
 /* ────────────────── Touch Init ────────────────── */
 

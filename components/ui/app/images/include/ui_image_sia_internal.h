@@ -8,7 +8,7 @@
     *
     * ui_image_sia_internal.h — Internal API for Static Icon Assigned (SIA) helper
     *
-    * Este header define la función interna images_ctl_internal_get_src() que
+    * Este header define la función interna ui_int__sia_icons_get_src_by_id() que
     * resuelve un ui_icon_id_t contra la tabla sia_icons[] y retorna el
     * lv_img_dsc_t* correspondiente, o NULL si el ID es inválido.
     *
@@ -21,4 +21,6 @@
     * Nota: esta función NO es parte de la API pública y no debe ser usada
     * fuera de ui_image_sia.c.
 */
-const lv_img_dsc_t *images_ctl_internal_get_src(ui_icon_id_t icon_id);
+const lv_img_dsc_t *ui_int__sia_icons_get_src_by_id(ui_icon_id_t icon_id);
+
+const char *ui_int__sia_images_get_path_by_id(ui_images_id_t image_id);

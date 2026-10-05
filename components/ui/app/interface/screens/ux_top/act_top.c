@@ -6,7 +6,8 @@
 /* Módulos */
 #include "interface.h"
 #include "ui_label_abs.h"
-#include "ui_image_sia_internal.h"
+#include "images.h"
+#include "ui_check.h"
 
 #define TAG "UI_INT_DTP"
 //********************************************************/
@@ -74,11 +75,11 @@ esp_err_t ui_int__dtop_show_popup(ui_int__dtop_popup_configure_t config) {
     const lv_image_dsc_t * icon_src = NULL;
     switch(config.type) {
         case dtopPOPUP_INFO:
-            icon_src = images_ctl_internal_get_src(UI_ICON_INFORMATION30);
+            icon_src = &img_dialog_info20;
             title = "Información";
             break;
         case dtopPOPUP_WARN:
-            icon_src = images_ctl_internal_get_src(UI_ICON_WARNING30);
+            icon_src = &img_dialog_warn20;
             title = "Advertencia";
             break;
         default:
@@ -338,7 +339,7 @@ void init_anim_notify_user_timeline(void) {
     notif_exit_timer = lv_timer_create(anim_notify_user_exit_timer_cb, 600, NULL);
     lv_timer_pause(notif_exit_timer);
 }
-esp_err_t ui_int__anim_notify_user_show_fmt(bool is_alert, const char *fmt, ...)
+esp_err_t ui_int__dtop_notify_user_show_fmt(bool is_alert, const char *fmt, ...)
 {
     if(fmt == NULL) return ESP_ERR_INVALID_ARG;
 
@@ -354,10 +355,10 @@ esp_err_t ui_int__anim_notify_user_show_fmt(bool is_alert, const char *fmt, ...)
         return ESP_ERR_NO_MEM;
     }
 
-    return ui_int__anim_notify_user_show(is_alert, text_static);
+    return ui_int__dtop_notify_user_show(is_alert, text_static);
 }
 
-esp_err_t ui_int__anim_notify_user_show(bool is_alert, const char *text)
+esp_err_t ui_int__dtop_notify_user_show(bool is_alert, const char *text)
 {
     if(text == NULL) return ESP_ERR_INVALID_ARG;
 
@@ -374,8 +375,8 @@ esp_err_t ui_int__anim_notify_user_show(bool is_alert, const char *text)
     ui_int__helper_label_abs_apply_sync(UI_LABEL_ABS_DTOP_NOTIFY_USER, text);
     
     const lv_image_dsc_t *img = is_alert ? 
-        images_ctl_internal_get_src(UI_ICON_WARNING30) : 
-        images_ctl_internal_get_src(UI_ICON_INFORMATION30);
+        &img_dialog_warn20 : 
+        &img_dialog_info20;
 
     if(objects.dtop_notifiy_img && img != NULL) {
         lv_image_set_src(objects.dtop_notifiy_img, img);
@@ -392,6 +393,103 @@ esp_err_t ui_int__anim_notify_user_show(bool is_alert, const char *text)
 //********************************************************/
 // END Notifications Fast Information END
 //********************************************************/
+
+
+//********************************************************/
+// Notch icons controller state internal devs
+//********************************************************/
+esp_err_t ui_int__dtop_wifi_state(const char* state_message, bool driver_ok, ui_icon_id_t icon)
+{
+    UX_CHECK_ABSOLUTE_EXCLUSIVE_CHAR(state_message, BUF_SIZE_MAX_NOTCH_MESSAGE_SERVICE, 0);
+
+    const lv_image_dsc_t *image = ui_int__sia_icons_get_src_by_id(icon);
+
+    lv_image_set_src(objects.dtop_notch_min_img_wifi, image);
+    lv_image_set_src(objects.dtop_notch_exp_dat_wifi_img, image);
+
+    if(driver_ok) {
+        lv_obj_remove_flag(objects.dtop_notch_min_img_wifi, LV_OBJ_FLAG_HIDDEN);
+    }else {
+        lv_obj_add_flag(objects.dtop_notch_min_img_wifi, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    ui_int__helper_label_abs_apply_sync(UI_LABEL_ABS_NOTCH_EXT_WIFI, state_message);
+    
+    return ESP_OK;
+}
+
+esp_err_t ui_int__dtop_zigbee_state(const char* state_message, bool driver_ok)
+{
+    UX_CHECK_ABSOLUTE_EXCLUSIVE_CHAR(state_message, BUF_SIZE_MAX_NOTCH_MESSAGE_SERVICE, 0);
+
+    /* No pido un ícono porque realmente un img estático en default es más que
+    suficiente, pero se puede acoplar uno rapidamente siguiendo la misma regla que la llamada de arriba */
+
+    if(driver_ok) {
+        lv_obj_remove_flag(objects.dtop_notch_min_img_iot, LV_OBJ_FLAG_HIDDEN);
+    }else {
+        lv_obj_add_flag(objects.dtop_notch_min_img_iot, LV_OBJ_FLAG_HIDDEN);
+    }
+    
+    ui_int__helper_label_abs_apply_sync(UI_LABEL_ABS_NOTCH_EXT_ZIGBEE, state_message);
+    
+    return ESP_OK;
+}
+esp_err_t ui_int__dtop_battery_state(uint16_t bat_percent, bool is_charging, bool driver_ok)
+{
+    if(!ui_int__display_is_created_ds_top()) return ESP_ERR_INVALID_STATE;
+
+    if(bat_percent > 100) return ESP_ERR_INVALID_ARG;
+
+    if(!driver_ok) goto exit;
+
+    const char* message_data = "Sin información";
+    const lv_image_dsc_t *img = NULL;
+
+    if(is_charging) {
+        lv_image_set_src(objects.dtop_notch_min_img_bat, &img_bat_charging30);
+        lv_image_set_src(objects.dtop_notch_exp_dat_bat_img, &img_bat_charging30);
+
+        img = &img_bat_charging30;
+        message_data = bat_percent == 100 ? "%hu%% Cargado" : "%hu%% Cargando";
+    }else{
+      message_data = "%hu%% descargando";
+      switch (bat_percent) {
+        case 0 ... 10:
+            img = &img_bat_ultra_low30;
+            message_data = "%hu%% Muy baja";
+            break;
+        case 11 ... 20:
+            img = &img_bat_low30;
+            break;
+        case 21 ... 60:
+            img = &img_bat_med30;
+            break;
+        case 61 ... 100:
+            img = &img_bat_max30;
+            break;
+      }
+    }
+exit:
+    /* Aplicador */
+    if(!driver_ok){ /* Si algo esta mal*/
+        lv_obj_add_flag(objects.dtop_notch_min_img_bat, LV_OBJ_FLAG_HIDDEN);
+        lv_image_set_src(objects.dtop_notch_exp_dat_bat_img, NULL);
+        ui_int__helper_label_abs_apply_sync_fmt(UI_LABEL_ABS_NOTCH_EXT_BAT, "%s", "Sin Controlador");
+        return ESP_FAIL;
+    }else{
+        lv_obj_remove_flag(objects.dtop_notch_min_img_bat, LV_OBJ_FLAG_HIDDEN);
+        lv_image_set_src(objects.dtop_notch_min_img_bat, img);
+        lv_image_set_src(objects.dtop_notch_exp_dat_bat_img, img);
+        ui_int__helper_label_abs_apply_sync_fmt(UI_LABEL_ABS_NOTCH_EXT_BAT, message_data, bat_percent);
+    }
+
+    return ESP_OK;
+}
+//********************************************************/
+// END Notch icons controller state internal devs END
+//********************************************************/
+
 
 //********************************************************/
 // PUBLIC API INTERNAL

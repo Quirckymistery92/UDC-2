@@ -23,7 +23,7 @@
 
 #include "esp_err.h"
 #include "lvgl.h"
-#include "../include/ui_manager.h"
+#include "ui_label.h"
 
 #ifdef __cplusplus
 extern "C" {

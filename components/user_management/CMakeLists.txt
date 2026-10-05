@@ -1,0 +1,10 @@
+idf_component_register(
+    SRCS
+        "src/user_mgr.cpp"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        "littlefs_controller"
+        "NVSm_sys" 
+        "ui" 
+)

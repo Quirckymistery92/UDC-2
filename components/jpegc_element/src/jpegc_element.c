@@ -12,6 +12,7 @@
  *     (The per-job input buffer read from SPIFFS is alloc'd/free'd per decode.)
  */
 
+ /* ESP */
 #include <string.h>
 #include <stdio.h>
 
@@ -25,18 +26,19 @@
 
 #include "driver/jpeg_decode.h"
 
+/* Módulos */
 #include "jpegc_element.h"
 #include "jpegc_element_private.h"
 
-/* ── Module tag ──────────────────────────────────────────────────────────── */
-static const char *TAG = "jpegc";
-
-/* ── Singleton context ───────────────────────────────────────────────────── */
-static jpegc_element_ctx_t s_ctx = {0};
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * Internal helpers
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* Variables */
+    static const char * const TAG = "jpegc";
+    static jpegc_element_ctx_t s_ctx = {0};
+    static app_desc_status_t apd = {
+        .app_desc = DSC_APP_DECODER_IMAGES,
+        .app_name = "Descompresor de imágenes",
+        .app_tag = TAG,
+        .init_result = ESP_OK
+    };
 
 /**
  * @brief Bytes-per-pixel for the selected output format.
@@ -276,18 +278,12 @@ static void priv_decode_task(void *arg)
  * Public API
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-esp_err_t jpegc_element_init(void)
+app_desc_status_t* jpegc_element_init(void)
 {
-    if (s_ctx.initialized) {
-        ESP_LOGW(TAG, "init: already initialised");
-        return ESP_OK;
-    }
+    DSC_RETURN_STRUCT_ON_FALSE(!s_ctx.initialized, &apd, ESP_OK);
 
     s_ctx.queue = xQueueCreate(JPEGC_ELEMENT_QUEUE_DEPTH, sizeof(jpegc_element_job_t));
-    if (!s_ctx.queue) {
-        ESP_LOGE(TAG, "init: failed to create queue");
-        return ESP_ERR_NO_MEM;
-    }
+    DSC_RETURN_STRUCT_ON_FALSE(s_ctx.queue, &apd, ESP_ERR_NO_MEM);
 
     BaseType_t ok = xTaskCreate(priv_decode_task,
                                 "jpegc_task",
@@ -296,19 +292,19 @@ esp_err_t jpegc_element_init(void)
                                 JPEGC_ELEMENT_TASK_PRIORITY,
                                 &s_ctx.task);
     if (ok != pdPASS) {
-        ESP_LOGE(TAG, "init: failed to create task");
         vQueueDelete(s_ctx.queue);
         s_ctx.queue = NULL;
-        return ESP_FAIL;
+        return DESC_AP_INSERT(&apd, ESP_FAIL);
     }
 
     s_ctx.initialized    = true;
     s_ctx.handle_count   = 0;
-    ESP_LOGI(TAG, "Initialised (queue depth=%u, task prio=%u, stack=%u B)",
+    ESP_LOGD(TAG, "Initialised (queue depth=%u, task prio=%u, stack=%u B)",
              JPEGC_ELEMENT_QUEUE_DEPTH,
              JPEGC_ELEMENT_TASK_PRIORITY,
              JPEGC_ELEMENT_TASK_STACK_SIZE);
-    return ESP_OK;
+
+    return DESC_AP_INSERT(&apd, ESP_OK);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */

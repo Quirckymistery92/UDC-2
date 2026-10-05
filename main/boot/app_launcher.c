@@ -1,5 +1,6 @@
 #include "app_launcher.h"
 
+/* ESP */
 #include "esp_log.h"
 #include "esp_err.h"
 
@@ -8,28 +9,81 @@
 
 /* Módulos */
 #include "NVSm_sys.h"
-#include "i2c_controller.h"
-#include "fatfs_controller.h"
+#include "desc_apps.h"
+#include "../main.h"
+#include "nvsm_boot.h"
 
-static uint8_t APP_RUN_RUTE = 1;
+/* Variables */
+    #define TAG "AppLauncher"
+    static uint16_t mask_boot = 0;
+    static uint16_t mask_failed = 0;
+    enum {
+        BOOT_INIT_NORMAL = 0,
+        BOOT_INIT_OFFENSIVE = 1,
+        BOOT_INIT_FLASH_RECOVERY = 2,
+        BOOT_INIT_RECOVERY = 3,
+    };
 
-esp_err_t app_launcher_init(const char *TAG)
+esp_err_t app_launcher_init(void)
 {
-    ESP_LOGI(TAG, "Inicializando NVS...");
-    ESP_ERROR_CHECK(NVSm_sys_init());
+    app_desc_status_t * app = NVSm_sys_init();
+    app_launcher_reg_nd_log(app);
+    DSC_RETURN_ERR_ON_STRUCT(app);
 
-    ESP_LOGI(TAG, "Inicializando comunicaciones I2C...");
-    ESP_ERROR_CHECK(i2c_controller_init());
+    bt_fail_history_t boot_hist_fail;
+    esp_err_t err = nvsm_boot_failcount_read(&boot_hist_fail);
+    if(likely(err == ESP_OK)){
+        if(unlikely(boot_hist_fail.actually_index >= APP_LAUNCHER_MAX_ERR_BOOTING)) {
+            /* Run boot recovery */
+        }
+    }
 
-    ESP_LOGI(TAG, "Inicializando y montando unidad FatFS...");
-    ESP_ERROR_CHECK(fatfs_controller_init());
+    esp_err_t ret = ESP_OK;
+    uint16_t bootinit = 0;
+    ret = nvsm_boot_bootinit_read(&bootinit);
+    if(unlikely(ret != ESP_OK)) ESP_LOGW(TAG, "Error de lectura de boot_init, usando default");
 
-    switch(APP_RUN_RUTE) {
-        case 1:
-            ESP_LOGI(TAG, "Iniciando app...");
-            return app_init_normal(TAG);
+    switch(bootinit) {
+        case BOOT_INIT_NORMAL:
+
+            ESP_LOGW(TAG, "Boot normal");
+            ret = app_init_normal(TAG);
+            if(unlikely(ret != ESP_OK)){
+                ESP_LOGE(TAG, "Error de inicialización de apps: %s", esp_err_to_name(ret));
+                nvsm_boot_failcount_write(mask_failed, ret);
+                return ESP_FAIL;
+            }
+            break;
+            
+        case BOOT_INIT_OFFENSIVE:
+            ESP_LOGW(TAG, "Boot ofensivo");
+            break;
+        case BOOT_INIT_FLASH_RECOVERY:
+            ESP_LOGW(TAG, "Boot recovery flash");
+            break;
+        case BOOT_INIT_RECOVERY:
+            ESP_LOGW(TAG, "Boot recovery");
+            break;
         default:
-            ESP_LOGE(TAG, "Ruta de inicio de aplicación no válida: %d", APP_RUN_RUTE);
-            return ESP_ERR_INVALID_STATE;
+            ESP_LOGW(TAG, "Boot desconocido: %d", bootinit);
+            return ESP_FAIL;
+    }
+
+    return ret;
+}
+
+void app_launcher_reg_nd_log(app_desc_status_t *app)
+{
+    if(unlikely(app == NULL)) return;
+
+    if(app->init_result != ESP_OK) {
+        ESP_LOGE(app->app_tag, "%s. RP---> (%s)", app->app_name, esp_err_to_name(app->init_result));
+    } else {
+        ESP_LOGI(app->app_tag, "%s. RP---> (%s)", app->app_name, esp_err_to_name(app->init_result));
+    }
+    if(app->init_result == ESP_OK) {
+        mask_boot |= app->app_desc;
+    }else {
+        mask_failed |= app->app_desc;
     }
 }

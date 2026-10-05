@@ -1,5 +1,8 @@
-version: "0.0.1"
-description: "LVGL 9 Custom Porting - UI Core Task System"
+version: "1.0.0"
+description: "Crystal Graphics estilo UX para ESP32-P4"
+license: "Apache-2.0"
+targets:
+  - esp32p4
 
 dependencies:
   lvgl/lvgl:

@@ -6,11 +6,12 @@
 
 /* Módulos */
 #include "../screens_int_all.h"
+#include "ui_image_sia_internal.h"
 
 esp_err_t ui_int_sys_actions_init(void);
 
-esp_err_t ui_pub_actions_backg_update_DSHOME(const char *image_path);
-esp_err_t ui_pub_actions_backg_update_DSLOCKED(const char *image_path);
+esp_err_t ui_pub_actions_backg_update_disp_home(const char *image_path);
+esp_err_t ui_pub_actions_backg_update_disp_lock(const char *image_path);
 
 typedef void (*ui_int__dtop_popup_callback_t)(void);
 
@@ -36,5 +37,9 @@ typedef struct {
 } ui_int__dtop_popup_configure_t;
 
 esp_err_t ui_int__dtop_show_popup(ui_int__dtop_popup_configure_t config);
-esp_err_t ui_int__anim_notify_user_show(bool is_alert, const char *text);
-esp_err_t ui_int__anim_notify_user_show_fmt(bool is_alert, const char *fmt, ...);
+esp_err_t ui_int__dtop_notify_user_show(bool is_alert, const char *text);
+esp_err_t ui_int__dtop_notify_user_show_fmt(bool is_alert, const char *fmt, ...);
+
+esp_err_t ui_int__dtop_zigbee_state(const char* state_message, bool driver_ok);
+esp_err_t ui_int__dtop_wifi_state(const char* state_message, bool driver_ok, ui_icon_id_t icon);
+esp_err_t ui_int__dtop_battery_state(uint16_t bat_percent, bool is_charging, bool driver_ok);

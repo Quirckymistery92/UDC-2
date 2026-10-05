@@ -5,6 +5,6 @@
 
 /* Módulos */
 
-void ui_int__display_create_ds_config(void);
+void ui_int__display_create_ds_settings(void);
 
-bool ui_int__display_is_created_ds_config(void);
+bool ui_int__display_is_created_ds_settings(void);
