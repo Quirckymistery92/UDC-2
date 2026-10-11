@@ -5,20 +5,20 @@
 
 <p align="center">
   
-  <a href="https://cppreference.com/c">
-    <img src="https://img.shields.io/badge/c-00599C?logo=c&logoColor=white" alt="C">
+  <a>
+    <img src="https://img.shields.io/badge/C-00599C" alt="C">
   </a>
   
-  <a href="https://cppreference.com/cpp">
-    <img src="https://img.shields.io/badge/c++-00599C?logo=c%2B%2B&logoColor=white" alt="C++">
+  <a>
+    <img src="https://img.shields.io/badge/C++-00599C" alt="C++">
   </a>
   
-  <a href="https://docs.espressif.com/projects/esp-idf/en/release-v5.5/esp32p4/index.html">
-    <img src="https://img.shields.io/badge/ESP--IDF-5.5.X-blue?logo=espressif" alt="ESP-IDF 5.5">
+  <a>
+    <img src="https://img.shields.io/badge/ESP--IDF-5.5.X-blue" alt="ESP-IDF 5.5">
   </a>
 
-  <a href="https://github.com">
-    <img src="https://img.shields.io/badge/LVGL-9.6.0-EA6A20?logo=lvgl&logoColor=white" alt="LVGL 9.6.0">
+  <a>
+    <img src="https://img.shields.io/badge/LVGL-9.5.0-EA6A20">
   </a>
 
   <a>
@@ -42,11 +42,11 @@
 
 ---
 > [!CAUTION]
-> **Baby Code**
+> **Baby Code**<br>
 > Este proyecto está en fase de desarrollo inicial, no posee estructura completa para todas las funcionalidades que ofrece, ¡aún hay mucho por construir!
 
 > [!NOTE]
-> **Aviso de Uso y Licencia Educativa**
+> **Aviso de Uso y Licencia Educativa**<br>
 > Este repositorio es un proyecto estrictamente personal desarrollado con fines didácticos. Se autoriza libremente la copia, modificación y redistribución del código para el aprendizaje, la experimentación y el uso compartido entre desarrolladores, siempre que no tenga fines comerciales.
 > 
 > *Exención de responsabilidad:* El uso de este software es bajo su propio riesgo. El autor no se hace responsable de ejecuciones indebidas, modificaciones maliciosas, daños derivados o aplicaciones fuera del marco legal vigente; dicha responsabilidad recae exclusivamente en quien lo ejecute.
@@ -86,7 +86,8 @@ Cloná el repositorio en tu PC, compilá y flashea, muy simple,
 ### • Instalación:
 
 > [!CAUTION]
-> **Verificar la revisión del chip ESP32-P4 antes de flashear.** Las revisiones anteriores a la v3.X (v0.x/v1.x) contienen erratas críticas de silicio y no son compatibles a nivel de compilación. Configurar correctamente el archivo `sdkconfig` acorde a la revisión del chip o este no arrancará. <br>Modificar el parámetro: `CONFIG_ESP32P4_REV_MIN_FULL`
+> **Verificar la revisión del chip ESP32-P4 antes de flashear.**<br>
+> Las revisiones anteriores a la v3.X (v0.x/v1.x) contienen erratas críticas de silicio y no son compatibles a nivel de compilación. Configurar correctamente el archivo `sdkconfig` acorde a la revisión del chip o este no arrancará. <br>Modificar el parámetro: `CONFIG_ESP32P4_REV_MIN_FULL`
 
 ##### 1. Descarga el proyecto en tu PC.
 
@@ -130,7 +131,7 @@ La documentación de hardware de la placa **GUITION JC8012P4A1** la podes encont
 
 ## Licencia
 
-Licencia: `CC BY-NC-SA 4.0`
+Licencia: `CC BY-NC-SA 4.0`<br>
 Amo lo libre, gratuito y usable para con los míos, esta fue una decisión desde el día que arranqué en local. Espero te sirva de ayuda algo de todo esto, tengo librerías que hice yo, otras con ayuda de IA y otras por la comunidad, por eso dejo los créditos correspondientes para cada trabajo, para que todos contemplemos alianza entre programadores.
 
 ---
@@ -141,28 +142,5 @@ Debido a que es un **proyecto personal**, no se aceptan **Pull Requests (PR)** n
 
 <br>
 
-<a href="https://github.com/Quirckymistery92/UDC-2/">
-    <font dir="auto" style="vertical-align: inherit;">
-        <font dir="auto" style="vertical-align: inherit;">UDC-2</font>
-    </font>
-</a>
-<font dir="auto" style="vertical-align: inherit;">
-    <font dir="auto" style="vertical-align: inherit;"> © 2025 por </font>
-</font>
-<a href="https://github.com/Quirckymistery92">
-    <font dir="auto" style="vertical-align: inherit;">
-        <font dir="auto" style="vertical-align: inherit;">Alex Jaque</font>
-    </font>
-</a>
-<font dir="auto" style="vertical-align: inherit;">
-    <font dir="auto" style="vertical-align: inherit;"> está bajo licencia </font>
-</font>
-<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">
-    <font dir="auto" style="vertical-align: inherit;">
-        <font dir="auto" style="vertical-align: inherit;">CC BY-NC-SA 4.0</font>
-    </font>
-</a>
-<img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;">
-<img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;">
-<img src="https://mirrors.creativecommons.org/presskit/icons/nc.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;">
-<img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;">
+<a href="https://github.com/Quirckymistery92/UDC-2/">UDC-2</a> © 2025 por <a href="https://github.com/Quirckymistery92">Alex Jaque</a> está bajo licencia <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> <img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="CC" align="middle" width="16" height="16"> <img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="BY" align="middle" width="16" height="16"> <img src="https://mirrors.creativecommons.org/presskit/icons/nc.svg" alt="NC" align="middle" width="16" height="16"> <img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="SA" align="middle" width="16" height="16">
+
