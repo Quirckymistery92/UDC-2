@@ -18,10 +18,12 @@
  * ESP32-P4 with PPA enabled) so the value tracks any future Kconfig change
  * without manual editing.
  *---------------------------------------------------------------------------*/
- #define LV_USE_ASSERT_OBJ 1
-#define LV_USE_ASSERT_NULL 1
-#define LV_USE_ASSERT_MALLOC 1
-#define LV_USE_ASSERT_STYLE 1
+ #define LV_USE_ASSERT_OBJ 0
+#define LV_USE_ASSERT_NULL 0
+#define LV_USE_ASSERT_MALLOC 0
+#define LV_USE_ASSERT_STYLE 0
+#define LV_USE_ASSERT_MEM_INTEGRITY 0
+#define LV_USE_OBSERVER 1
 
 #define LV_ATTRIBUTE_MEM_ALIGN_DEFAULT_SIZE 128
 
@@ -33,10 +35,21 @@
 #endif
 
 /* Activar el uso de funciones de memoria personalizadas */
-#define LV_USE_STDLIB_MALLOC    LV_STDLIB_CUSTOM
+#define LV_USE_STDLIB_MALLOC    LV_STDLIB_BUILTIN
+#if LV_USE_STDLIB_MALLOC == LV_STDLIB_BUILTIN
+    #define LV_MEM_SIZE (1024 * 1024U) 
+    #define LV_MEM_POOL_EXPAND_SIZE 0
+    #define LV_MEM_ADR 0
+    #if LV_MEM_ADR == 0
+        #undef LV_MEM_POOL_INCLUDE
+        #undef LV_MEM_POOL_ALLOC
+    #endif
+#endif
+#define LV_ATTRIBUTE_LARGE_RAM_ARRAY EXT_RAM_BSS_ATTR
+
 #define LV_USE_STDLIB_STRING    LV_STDLIB_CLIB
 #define LV_USE_STDLIB_SPRINTF  LV_STDLIB_CLIB
-#define LV_USE_LOG 1
+#define LV_USE_LOG 0
 #if LV_USE_LOG
     #define LV_LOG_LEVEL LV_LOG_LEVEL_INFO
     #define LV_LOG_PRINTF 1

@@ -240,7 +240,8 @@ esp_err_t esp_lcd_touch_new_i2c_gsl3680(esp_lcd_panel_io_handle_t io, const esp_
     }
 
     /* Read status and config info */
-    ESP_LOGI(TAG,"init gls3680");
+    ESP_LOGI(TAG,"Initializing GSL3680");
+
     touch_gsl3680_read_cfg(esp_lcd_touch_gsl3680);
     esp_lcd_touch_gsl3680_init(esp_lcd_touch_gsl3680);
     ret = esp_lcd_touch_gsl3680_read_ram_fw(esp_lcd_touch_gsl3680);
@@ -440,12 +441,18 @@ static esp_err_t esp_lcd_touch_gsl3680_del(esp_lcd_touch_handle_t tp)
 /*===================================================================================================================================================================================================*/
 static esp_err_t esp_lcd_touch_gsl3680_init(esp_lcd_touch_handle_t tp)
 {
-    ESP_LOGI(TAG,"start init");
+    ESP_LOGD(TAG,"start init");
+
     esp_lcd_touch_gsl3680_clear_reg(tp);
+
     touch_gsl3680_reset(tp);
+
     esp_lcd_touch_gsl3680_load_fw(tp);
+
     esp_lcd_touch_gsl3680_startup_chip(tp);
+
     touch_gsl3680_reset(tp);
+
     esp_lcd_touch_gsl3680_startup_chip(tp);
 
     return ESP_OK;
@@ -496,21 +503,21 @@ static esp_err_t touch_gsl3680_read_cfg(esp_lcd_touch_handle_t tp)
     write[2] = 0x56;
     assert(tp != NULL);
 
-    ESP_LOGI(TAG,"gsl3680 connect");
+    ESP_LOGD(TAG,"gsl3680 connect");
 
     ESP_RETURN_ON_ERROR(touch_gsl3680_i2c_read(tp, 0xf0, (uint8_t *)&buf, 4), TAG, "gsl3680 read error!");
     ESP_LOGI(TAG,"gsl3680 read reg 0xf0 before is %x %x %x %x",buf[0],buf[1],buf[2],buf[3]);
     vTaskDelay(pdMS_TO_TICKS(20));
-    ESP_LOGI(TAG,"gsl3680 writing 0xf0 0x12");
+    ESP_LOGD(TAG,"gsl3680 writing 0xf0 0x12");
     ESP_RETURN_ON_ERROR(touch_gsl3680_i2c_write(tp,0xf0,write,4),TAG,"gsl3680 read error");
     vTaskDelay(pdMS_TO_TICKS(20));
     ESP_RETURN_ON_ERROR(touch_gsl3680_i2c_read(tp, 0xf0, (uint8_t *)&buf, 4), TAG, "gsl3680 read error!");
-    ESP_LOGI(TAG,"gsl3680 read reg 0xf0 after is %x %x %x %x",buf[0],buf[1],buf[2],buf[3]);
+    ESP_LOGD(TAG,"gsl3680 read reg 0xf0 after is %x %x %x %x",buf[0],buf[1],buf[2],buf[3]);
 
     if(i2c_buffer_read == i2c_buffer_write)
     {
         ret = ESP_OK;
-        ESP_LOGI(TAG,"read cfg success");
+        ESP_LOGD(TAG,"read cfg success");
     }
     else 
         ret = ESP_FAIL;
@@ -524,7 +531,6 @@ static esp_err_t esp_lcd_touch_gsl3680_startup_chip(esp_lcd_touch_handle_t tp)
     uint8_t write_buf[4];
     uint8_t addr = 0xe0;
     write_buf[0] = 0x00;
-    ESP_LOGI(TAG,"enter");
     ESP_RETURN_ON_ERROR(touch_gsl3680_i2c_write(tp,addr,write_buf,1),TAG,"gsl3680 read error");
     vTaskDelay(pdMS_TO_TICKS(10));
 
@@ -536,13 +542,11 @@ static esp_err_t esp_lcd_touch_gsl3680_read_ram_fw(esp_lcd_touch_handle_t tp)
 {
     uint8_t read_buf[4];
     uint8_t addr = 0xb0;
-    ESP_LOGI(TAG,"enter read_ram_fw");
     vTaskDelay(pdMS_TO_TICKS(30));
     ESP_RETURN_ON_ERROR(touch_gsl3680_i2c_read(tp, addr, (uint8_t *)&read_buf, 4), TAG, "gsl3680 read error!");
-    ESP_LOGI(TAG,"gsl3680 startup_chip failed read 0xb0 = %x,%x,%x,%x ",read_buf[3],read_buf[2],read_buf[1],read_buf[0]);
     if(read_buf[3] != 0x5a || read_buf[2] != 0x5a || read_buf[1] != 0x5a || read_buf[0] != 0x5a)
     {
-         
+        ESP_LOGE(TAG,"gsl3680 startup_chip failed read 0xb0 = %x,%x,%x,%x ",read_buf[3],read_buf[2],read_buf[1],read_buf[0]);
         return ESP_FAIL;
     }
     return ESP_OK;
@@ -553,25 +557,21 @@ static esp_err_t touch_gsl3680_i2c_read(esp_lcd_touch_handle_t tp, uint16_t reg,
     assert(tp != NULL);
     assert(data != NULL);
 
-
-    /* Read data */
     return esp_lcd_panel_io_rx_param(tp->io, reg, data, len);
   
 }
 
-static esp_err_t touch_gsl3680_i2c_write(esp_lcd_touch_handle_t tp, uint16_t reg, uint8_t *data,uint8_t len)
+static esp_err_t touch_gsl3680_i2c_write(esp_lcd_touch_handle_t tp, uint16_t reg, uint8_t *data, uint8_t len)
 {
     assert(tp != NULL);
+    assert(data != NULL);
 
-    // *INDENT-OFF*
-    // /* Write data */
     return esp_lcd_panel_io_tx_param(tp->io, reg, data, len);
-    // // *INDENT-ON*
 }
 
 static esp_err_t esp_lcd_touch_gsl3680_load_fw(esp_lcd_touch_handle_t tp)
 {
-    ESP_LOGI(TAG,"start load fw");
+    ESP_LOGD(TAG,"start load fw");
     uint16_t addr;
     unsigned char wrbuf[4];
     uint16_t source_line = 0;
@@ -590,7 +590,7 @@ static esp_err_t esp_lcd_touch_gsl3680_load_fw(esp_lcd_touch_handle_t tp)
             touch_gsl3680_i2c_write(tp,addr,wrbuf,4);
         
     }
-    ESP_LOGI(TAG,"load fw success");
+    ESP_LOGD(TAG,"load fw success");
     return ESP_OK;
 }
 
@@ -599,7 +599,7 @@ static esp_err_t esp_lcd_touch_gsl3680_clear_reg(esp_lcd_touch_handle_t tp)
     uint8_t addr;
     uint8_t wrbuf[4];
 
-    ESP_LOGI(TAG,"clear reg");
+    ESP_LOGD(TAG,"clear reg");
     // addr = 0xe0;
     // wrbuf[0] = 0x88;
     // touch_gsl3680_i2c_write(tp,addr,wrbuf,1);

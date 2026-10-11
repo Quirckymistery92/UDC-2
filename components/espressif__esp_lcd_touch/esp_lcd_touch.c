@@ -15,7 +15,7 @@
 #include "esp_log.h"
 #include "esp_lcd_touch.h"
 
-static const char *TAG = "TP";
+static const char * const TAG = "TP";
 
 /*******************************************************************************
 * Function definitions

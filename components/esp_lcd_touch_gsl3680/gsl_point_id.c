@@ -2744,7 +2744,7 @@ static int DataCheck(void)
 
 void gsl_DataInit(unsigned int *conf_in)
 {
-	ESP_LOGI(TAG,"gsl_DataInit");
+	ESP_LOGD(TAG,"gsl_DataInit");
 	int i, j;
 	unsigned int *conf;
 	int len;

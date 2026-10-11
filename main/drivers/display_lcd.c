@@ -7,6 +7,7 @@
 
 #include "display_lcd.h"
 
+/* ESP */
 #include "driver/ledc.h"
 #include "esp_err.h"
 #include "esp_log.h"
@@ -15,15 +16,21 @@
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_mipi_dsi.h"
 #include "esp_ldo_regulator.h"
+
+/* Módulos */
 #include "esp_lcd_jd9365.h"
+#include "desc_apps.h"
 
-static const char *TAG = "display_lcd";
+/* Variables */
+    #define TAG "display_lcd"
 
-/* ────────────────── JD9365 Panel Init Commands ────────────────── */
-/* Vendor-specific register initialization for the 800x1280 panel.
- * Configures voltage, gamma, display routing, and timing.
- * Taken from the reference demo (JC8012P4A1C board).
- */
+    static app_desc_status_t app = {
+        .app_desc = DSC_DRIVER_BRIGHTNESS,
+        .app_name = "Driver Backlight",
+        .app_tag = TAG,
+        .init_result = ESP_OK
+    };
+
 static const jd9365_lcd_init_cmd_t lcd_init_cmds[] = {
     /* ── Page 0 ── */
     {0xE0, (const uint8_t[]){0x00}, 1, 0},
@@ -275,7 +282,7 @@ static const jd9365_lcd_init_cmd_t lcd_init_cmds[] = {
 
 /* ────────────────── Backlight (LEDC) ────────────────── */
 
-esp_err_t display_lcd_brightness_init(void)
+app_desc_status_t* display_lcd_brightness_init(void)
 {
     const ledc_timer_config_t bl_timer = {
         .speed_mode      = LEDC_LOW_SPEED_MODE,
@@ -284,7 +291,8 @@ esp_err_t display_lcd_brightness_init(void)
         .freq_hz         = 5000,
         .clk_cfg         = LEDC_AUTO_CLK,
     };
-    ESP_RETURN_ON_ERROR(ledc_timer_config(&bl_timer), TAG, "LEDC timer config failed");
+    esp_err_t ret = ledc_timer_config(&bl_timer);
+    DSC_RETURN_STRUCT_ON_FALSE(ret == ESP_OK, &app, ret);
 
     const ledc_channel_config_t bl_channel = {
         .gpio_num   = LCD_GPIO_BL,
@@ -294,16 +302,17 @@ esp_err_t display_lcd_brightness_init(void)
         .timer_sel  = LEDC_TIMER_1,
         .duty       = 0,
         .hpoint     = 0,
+        .flags.output_invert = 0
     };
-    ESP_RETURN_ON_ERROR(ledc_channel_config(&bl_channel), TAG, "LEDC channel config failed");
+    ret = ledc_channel_config(&bl_channel);
+    DSC_RETURN_STRUCT_ON_FALSE(ret == ESP_OK, &app, ret);
 
-    return ESP_OK;
+    return DESC_AP_INSERT(&app, ret);
 }
 
-esp_err_t display_lcd_brightness_set(int brightness_percent)
+esp_err_t display_lcd_brightness_set(uint8_t brightness_percent)
 {
     if (brightness_percent > 100) brightness_percent = 100;
-    if (brightness_percent < 0)   brightness_percent = 0;
 
     ESP_LOGI(TAG, "Setting LCD backlight: %d%%", brightness_percent);
     uint32_t duty = (1023 * brightness_percent) / 100;
@@ -341,7 +350,6 @@ esp_err_t display_lcd_init(lcd_handles_t *ret_handles)
 {
     esp_err_t ret = ESP_OK;
 
-    ESP_RETURN_ON_ERROR(display_lcd_brightness_init(), TAG, "Brightness init failed");
     ESP_RETURN_ON_ERROR(enable_dsi_phy_power(), TAG, "DSI PHY power failed");
 
     esp_lcd_dsi_bus_handle_t mipi_dsi_bus = NULL;

@@ -1,4 +1,7 @@
-/*
+/**
+ * @file display_lcd.h
+ * @brief LCD display helper API.
+ *
  * SPDX-FileCopyrightText: 2025
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -47,26 +50,6 @@ typedef struct {
     esp_lcd_panel_handle_t      panel;
     esp_lcd_panel_handle_t      control;
 } lcd_handles_t;
-
-/**
- * @brief Initialize display backlight (LEDC PWM)
- */
-esp_err_t display_lcd_brightness_init(void);
-
-/**
- * @brief Set display brightness (0-100%)
- */
-esp_err_t display_lcd_brightness_set(int brightness_percent);
-
-/**
- * @brief Turn backlight ON (100%)
- */
-esp_err_t display_lcd_backlight_on(void);
-
-/**
- * @brief Turn backlight OFF (0%)
- */
-esp_err_t display_lcd_backlight_off(void);
 
 /**
  * @brief Create and initialize the MIPI-DSI LCD panel

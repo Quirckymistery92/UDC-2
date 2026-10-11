@@ -1,4 +1,7 @@
-/*
+/**
+ * @file display_touch.h
+ * @brief Touch driver configuration for the GSL3680 controller.
+ *
  * SPDX-FileCopyrightText: 2025
  * SPDX-License-Identifier: Apache-2.0
  *

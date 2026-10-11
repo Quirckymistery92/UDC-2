@@ -12,6 +12,7 @@
  *     (The per-job input buffer read from SPIFFS is alloc'd/free'd per decode.)
  */
 
+ /* ESP */
 #include <string.h>
 #include <stdio.h>
 
@@ -25,18 +26,19 @@
 
 #include "driver/jpeg_decode.h"
 
+/* Módulos */
 #include "jpegc_element.h"
 #include "jpegc_element_private.h"
 
-/* ── Module tag ──────────────────────────────────────────────────────────── */
-static const char *TAG = "jpegc";
-
-/* ── Singleton context ───────────────────────────────────────────────────── */
-static jpegc_element_ctx_t s_ctx = {0};
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * Internal helpers
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* Variables */
+    static const char * const TAG = "jpegc";
+    static jpegc_element_ctx_t s_ctx = {0};
+    static app_desc_status_t apd = {
+        .app_desc = DSC_APP_DECODER_IMAGES,
+        .app_name = "Descompresor de imágenes",
+        .app_tag = TAG,
+        .init_result = ESP_OK
+    };
 
 /**
  * @brief Bytes-per-pixel for the selected output format.
@@ -66,12 +68,6 @@ static inline jpeg_dec_output_format_t priv_map_dec_format(jpegc_element_output_
     }
 }
 
-/**
- * @brief Map wrapper enum → LVGL color format.
- *
- * YCbCr422 has no native LVGL v9 format; LV_COLOR_FORMAT_RAW is used so that
- * the caller can render or post-process the raw YUV data.
- */
 static inline lv_color_format_t priv_map_lv_format(jpegc_element_output_format_t fmt)
 {
     switch (fmt) {
@@ -83,16 +79,6 @@ static inline lv_color_format_t priv_map_lv_format(jpegc_element_output_format_t
     }
 }
 
-/**
- * @brief Allocate an output buffer in PSRAM using the JPEG driver helper.
- *
- * jpeg_alloc_decoder_mem ensures the correct memory capabilities and alignment
- * for the HW DMA. The returned actual_size may be >= requested size.
- *
- * @param[in]  min_size     Minimum required bytes.
- * @param[out] actual_size  Actual bytes allocated (stored in the handle).
- * @return Pointer to allocated memory, or NULL on failure.
- */
 static uint8_t *priv_alloc_output_buf(size_t min_size, size_t *actual_size)
 {
     jpeg_decode_memory_alloc_cfg_t cfg = {
@@ -119,12 +105,12 @@ static void priv_decode_task(void *arg)
         if (xQueueReceive(s_ctx.queue, &job, portMAX_DELAY) != pdTRUE) {
             continue;
         }
-
+        
         jpegc_element_handle_t h = job.handle;
 
         /* ── Pre-decode callback ─────────────────────────────────────────── */
         if (h->config.pre_cb) {
-            h->config.pre_cb();
+            h->config.pre_cb(job.target_obj);
         }
 
         /* Prepare a default post_data; overwritten on success. */
@@ -179,7 +165,7 @@ static void priv_decode_task(void *arg)
 
         if (bytes_read != (size_t)file_size) {
             ESP_LOGE(TAG, "Short read %zu/%ld for: %s", bytes_read, file_size, job.filepath);
-            free(in_buf);
+            heap_caps_free(in_buf);
             DELIVER_ERROR(ESP_FAIL);
             continue;
         }
@@ -190,7 +176,7 @@ static void priv_decode_task(void *arg)
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "jpeg_decoder_get_info failed (%s) for: %s",
                      esp_err_to_name(ret), job.filepath);
-            free(in_buf);
+            heap_caps_free(in_buf);
             DELIVER_ERROR(ret);
             continue;
         }
@@ -208,7 +194,7 @@ static void priv_decode_task(void *arg)
             if (!h->out_buf) {
                 ESP_LOGE(TAG, "Cannot alloc auto output buffer (%zu B) in PSRAM for: %s",
                          needed, job.filepath);
-                free(in_buf);
+                heap_caps_free(in_buf);
                 DELIVER_ERROR(ESP_ERR_NO_MEM);
                 continue;
             }
@@ -225,7 +211,7 @@ static void priv_decode_task(void *arg)
                      "(img %lux%lu, bpp %u). Buffer is fixed – no realloc.",
                      (void *)h, needed, h->out_buf_size,
                      (unsigned long)pic_info.width, (unsigned long)pic_info.height, bpp);
-            free(in_buf);
+            heap_caps_free(in_buf);
             DELIVER_ERROR(ESP_ERR_NO_MEM);
             continue;
         }
@@ -245,14 +231,25 @@ static void priv_decode_task(void *arg)
                                    in_buf,       (uint32_t)bytes_read,
                                    h->out_buf,   (uint32_t)h->out_buf_size,
                                    &out_size);
-        free(in_buf);   /* Input buffer no longer needed. */
 
+        /* Verify decoder result and avoid overruns into adjacent heap metadata. */
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "[%p] jpeg_decoder_process failed: %s for: %s",
                      (void *)h, esp_err_to_name(ret), job.filepath);
+            heap_caps_free(in_buf);
             DELIVER_ERROR(ret);
             continue;
         }
+
+        if ((size_t)out_size > h->out_buf_size) {
+            ESP_LOGE(TAG, "[%p] Decoder reported out_size=%u > allocated=%zu for: %s",
+                     (void *)h, out_size, h->out_buf_size, job.filepath);
+            heap_caps_free(in_buf);
+            DELIVER_ERROR(ESP_ERR_NO_MEM);
+            continue;
+        }
+
+        heap_caps_free(in_buf);   /* Input buffer no longer needed. */
 
         /* ── Populate lv_img_dsc_t ───────────────────────────────────────── */
         h->img_dsc.header.magic  = LV_IMAGE_HEADER_MAGIC;
@@ -281,18 +278,12 @@ static void priv_decode_task(void *arg)
  * Public API
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-esp_err_t jpegc_element_init(void)
+app_desc_status_t* jpegc_element_init(void)
 {
-    if (s_ctx.initialized) {
-        ESP_LOGW(TAG, "init: already initialised");
-        return ESP_OK;
-    }
+    DSC_RETURN_STRUCT_ON_FALSE(!s_ctx.initialized, &apd, ESP_OK);
 
     s_ctx.queue = xQueueCreate(JPEGC_ELEMENT_QUEUE_DEPTH, sizeof(jpegc_element_job_t));
-    if (!s_ctx.queue) {
-        ESP_LOGE(TAG, "init: failed to create queue");
-        return ESP_ERR_NO_MEM;
-    }
+    DSC_RETURN_STRUCT_ON_FALSE(s_ctx.queue, &apd, ESP_ERR_NO_MEM);
 
     BaseType_t ok = xTaskCreate(priv_decode_task,
                                 "jpegc_task",
@@ -301,19 +292,19 @@ esp_err_t jpegc_element_init(void)
                                 JPEGC_ELEMENT_TASK_PRIORITY,
                                 &s_ctx.task);
     if (ok != pdPASS) {
-        ESP_LOGE(TAG, "init: failed to create task");
         vQueueDelete(s_ctx.queue);
         s_ctx.queue = NULL;
-        return ESP_FAIL;
+        return DESC_AP_INSERT(&apd, ESP_FAIL);
     }
 
     s_ctx.initialized    = true;
     s_ctx.handle_count   = 0;
-    ESP_LOGI(TAG, "Initialised (queue depth=%u, task prio=%u, stack=%u B)",
+    ESP_LOGD(TAG, "Initialised (queue depth=%u, task prio=%u, stack=%u B)",
              JPEGC_ELEMENT_QUEUE_DEPTH,
              JPEGC_ELEMENT_TASK_PRIORITY,
              JPEGC_ELEMENT_TASK_STACK_SIZE);
-    return ESP_OK;
+
+    return DESC_AP_INSERT(&apd, ESP_OK);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */
@@ -341,12 +332,8 @@ esp_err_t jpegc_element_handle_create(jpegc_element_handle_t *handle,
         ESP_LOGE(TAG, "handle_create: failed to allocate handle struct");
         return ESP_ERR_NO_MEM;
     }
-
-    /* Deep copy of config (pointers like fs_letter are kept as-is; caller
-     * must keep those string literals alive for the handle's lifetime). */
+    
     h->config = *config;
-
-    /* Acquire a dedicated HW decoder engine instance. */
     jpeg_decode_engine_cfg_t eng_cfg = {
         .intr_priority = config->intr_priority,
         .timeout_ms    = config->timeout_ms,
@@ -358,7 +345,6 @@ esp_err_t jpegc_element_handle_create(jpegc_element_handle_t *handle,
         return ret;
     }
 
-    /* Pre-allocate output buffer when buff_kb is specified (not -1). */
     if (config->buff_kb != -1) {
         size_t req = ((size_t)(uint32_t)config->buff_kb + (size_t)config->extra_kb) * 1024U;
         h->out_buf = priv_alloc_output_buf(req, &h->out_buf_size);
@@ -439,7 +425,7 @@ esp_err_t jpegc_element_cleanup(jpegc_element_handle_t handle)
 
     /* Release output buffer. */
     if (handle->out_buf) {
-        free(handle->out_buf);
+        heap_caps_free(handle->out_buf);
         handle->out_buf       = NULL;
         handle->out_buf_size  = 0;
         handle->buf_size_fixed = false;
