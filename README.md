@@ -22,7 +22,7 @@
   </a>
 
   <a>
-    <img src="https://img.shields.io/github/license/Quirckymistery92/UDC-2.svg" alt="License">
+    <img src="https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-red" alt="License">
   </a>
 </p>
 
@@ -41,6 +41,7 @@
 </p>
 
 ---
+
 > [!CAUTION]
 > **Baby Code**<br>
 > Este proyecto está en fase de desarrollo inicial, no posee estructura completa para todas las funcionalidades que ofrece, ¡aún hay mucho por construir!
@@ -51,9 +52,10 @@
 > 
 > *Exención de responsabilidad:* El uso de este software es bajo su propio riesgo. El autor no se hace responsable de ejecuciones indebidas, modificaciones maliciosas, daños derivados o aplicaciones fuera del marco legal vigente; dicha responsabilidad recae exclusivamente en quien lo ejecute.
 
----
+<br>
 
 ## Características
+
   Además de las características físicas que ofrece **GUITION JC8012P4A1**, este firmware ofrece o planea implementar:
 
  - [x] Interfaz gráfica UX basada en el estilo Soft Glass.
@@ -72,16 +74,14 @@
  - [ ] Gestor de carga de batería I2C `MOD. HARDWARE`
 
 Estado de desarrollo de los boot's:
- - [x] Boot Normal <progress value="20" max="100"></progress> En progreso (20%).
- - [ ] **Boot Ofensivo.** <progress value="0" max="100"></progress> Standby
- - [ ] Recovery Boot. <progress value="0" max="100"></progress> Standby
- - [ ] Recovery NVS Boot. <progress value="0" max="100"></progress> Standby
+ - [x] **Boot Normal ![](https://geps.dev/progress/20?dangerColor=800000&warningColor=ff9900&successColor=006600) Diseñando...**
+ - [ ] Boot Ofensivo. ![](https://geps.dev/progress/0?dangerColor=800000&warningColor=ff9900&successColor=006600) Standby
+ - [ ] Recovery Boot. ![](https://geps.dev/progress/0?dangerColor=800000&warningColor=ff9900&successColor=006600) Standby
+ - [ ] Recovery NVS Boot. ![](https://geps.dev/progress/0?dangerColor=800000&warningColor=ff9900&successColor=006600) Standby
 
----
+<br>
 
 ## Instalación, configuraciones y flasheo.
-
-Cloná el repositorio en tu PC, compilá y flashea, muy simple, 
 
 ### • Instalación:
 
@@ -121,20 +121,20 @@ idf.py menuconfig
 # Cambia '/dev/ttyACM0' por el número de puerto asignado en tu PC.
 idf.py -p /dev/ttyACM0 flash monitor
 ```
----
+<br>
 
 ## Documentación
  
 La documentación de hardware de la placa **GUITION JC8012P4A1** la podes encontrar en este [Repositorio](https://github.com/profi-max/JC8012P4A1_BSP_ESP32P4). Actualmente está en inglés, pronto les dejaré todo el datasheet en español argentino :)
 
----
+<br>
 
 ## Licencia
 
 Licencia: `CC BY-NC-SA 4.0`<br>
 Amo lo libre, gratuito y usable para con los míos, esta fue una decisión desde el día que arranqué en local. Espero te sirva de ayuda algo de todo esto, tengo librerías que hice yo, otras con ayuda de IA y otras por la comunidad, por eso dejo los créditos correspondientes para cada trabajo, para que todos contemplemos alianza entre programadores.
 
----
+<br>
 
 ## Extra
 
